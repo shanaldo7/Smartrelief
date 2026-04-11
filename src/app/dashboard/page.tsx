@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map, CheckCircle } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import dynamic from "next/dynamic";
 import {
   ChartConfig,
   ChartContainer,
@@ -20,11 +21,19 @@ import {
 } from "@/components/ui/chart";
 import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 
+// Dynamically import map to avoid SSR issues with Leaflet
+const InteractiveMap = dynamic(() => import("@/components/Map"), { 
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground">Initializing Map Engine...</div>
+});
+
 interface Task {
   id: string;
   title: string;
   description: string;
   location: string;
+  latitude: number;
+  longitude: number;
   urgency: "low" | "medium" | "high";
   priority: number;
   skillsRequired: string[];
@@ -37,6 +46,8 @@ interface Volunteer {
   id: string;
   name: string;
   location: string;
+  latitude: number;
+  longitude: number;
   skills: string[];
   createdAt?: any;
 }
@@ -51,15 +62,11 @@ interface Match {
 }
 
 const SAMPLE_NGO_DATA = [
-  { title: "Flood Shelter Support", description: "Assisting families with bedding and food supplies in flooded residential zones.", skillsRequired: ["General Labor", "Admin"], location: "Riverside", urgency: "high", priority: 3, status: "open", submittedBy: "Emergency Response NGO" },
-  { title: "First Aid Station Assistance", description: "Looking for healthcare workers to assist at the mobile clinics.", skillsRequired: ["Healthcare"], location: "Downtown", urgency: "high", priority: 3, status: "open", submittedBy: "Red Cross" },
-  { title: "Logistics Coordinator", description: "Coordinating truck arrivals and inventory of water supplies.", skillsRequired: ["Admin", "Tech Support"], location: "East Port", urgency: "medium", priority: 2, status: "open", submittedBy: "Food Bank" },
-  { title: "Tech Support for Ops Center", description: "Maintaining internet and radio comms for rescue teams.", skillsRequired: ["Tech Support"], location: "Command Center", urgency: "medium", priority: 2, status: "open", submittedBy: "Response Corps" },
-  { title: "Neighborhood Cleanup", description: "Clearing debris from local roads to allow emergency access.", skillsRequired: ["General Labor", "Driving"], location: "West Hills", urgency: "low", priority: 1, status: "open", submittedBy: "City Council" },
-  { title: "Water Distribution", description: "Delivering clean water to families in cut-off areas.", skillsRequired: ["Driving", "General Labor"], location: "Riverside", urgency: "high", priority: 3, status: "open", submittedBy: "WaterAid" },
-  { title: "Mental Health Support", description: "Providing counseling for families affected by the disaster.", skillsRequired: ["Healthcare"], location: "Downtown", urgency: "medium", priority: 2, status: "open", submittedBy: "Unity Care" },
-  { title: "Emergency Kitchen Help", description: "Preparing hot meals for displaced residents.", skillsRequired: ["Cooking", "General Labor"], location: "East Port", urgency: "high", priority: 3, status: "open", submittedBy: "Relief Food" },
-  { title: "Satellite Link Setup", description: "Installing temporary communication hubs in remote areas.", skillsRequired: ["Tech Support"], location: "West Hills", urgency: "medium", priority: 2, status: "open", submittedBy: "CommAid" },
+  { title: "Flood Shelter Support", description: "Assisting families with bedding and food supplies in flooded residential zones.", skillsRequired: ["General Labor", "Admin"], location: "Riverside", latitude: 19.0760, longitude: 72.8777, urgency: "high", priority: 3, status: "open", submittedBy: "Emergency Response NGO" },
+  { title: "First Aid Station Assistance", description: "Looking for healthcare workers to assist at the mobile clinics.", skillsRequired: ["Healthcare"], location: "Downtown", latitude: 18.9220, longitude: 72.8347, urgency: "high", priority: 3, status: "open", submittedBy: "Red Cross" },
+  { title: "Logistics Coordinator", description: "Coordinating truck arrivals and inventory of water supplies.", skillsRequired: ["Admin", "Tech Support"], location: "East Port", latitude: 19.0176, longitude: 72.8561, urgency: "medium", priority: 2, status: "open", submittedBy: "Food Bank" },
+  { title: "Tech Support for Ops Center", description: "Maintaining internet and radio comms for rescue teams.", skillsRequired: ["Tech Support"], location: "Command Center", latitude: 19.1136, longitude: 72.8697, urgency: "medium", priority: 2, status: "open", submittedBy: "Response Corps" },
+  { title: "Neighborhood Cleanup", description: "Clearing debris from local roads to allow emergency access.", skillsRequired: ["General Labor", "Driving"], location: "West Hills", latitude: 19.1828, longitude: 72.8402, urgency: "low", priority: 1, status: "open", submittedBy: "City Council" },
 ];
 
 const chartConfig = {
@@ -75,6 +82,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
+  const [mapZoom, setMapZoom] = useState(5);
 
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
@@ -185,6 +194,17 @@ export default function Dashboard() {
     }
   };
 
+  const handleFocusCritical = () => {
+    const highUrgency = rawTasks?.find(t => t.urgency === 'high');
+    if (highUrgency && highUrgency.latitude) {
+      setMapCenter([highUrgency.latitude, highUrgency.longitude]);
+      setMapZoom(12);
+      toast({ title: "Map Focused", description: "Zoomed into high-urgency incident zone." });
+    } else {
+      toast({ variant: "destructive", title: "No Data", description: "No high-urgency tasks found to focus on." });
+    }
+  };
+
   const handleAssignVolunteer = (taskId: string, volunteerName: string) => {
     if (!db) return;
     const taskRef = doc(db, "tasks", taskId);
@@ -227,12 +247,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto px-4 py-8 max-w-7xl">
-        <header className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="space-y-1">
             <h1 className="text-4xl font-extrabold tracking-tight font-headline text-foreground">Relief Command Center</h1>
-            <p className="text-muted-foreground">Strategic overview of disaster impact and volunteer mobilization.</p>
+            <p className="text-muted-foreground">Strategic real-time mapping and resource mobilization.</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Button variant="outline" className="gap-2" onClick={handleFocusCritical}>
+              <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical
+            </Button>
             <Button 
               variant="default" 
               className="shadow-sm gap-2"
@@ -246,7 +269,7 @@ export default function Dashboard() {
                <div className="flex items-center gap-1.5 border-r pr-4">
                  <Activity className="h-4 w-4 text-primary" />
                  <span className="text-sm font-bold">{rawTasks?.filter(t => t.status === 'open').length || 0}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-semibold ml-1">Active Needs</span>
+                 <span className="text-[10px] text-muted-foreground uppercase font-semibold ml-1">Needs</span>
                </div>
                <div className="flex items-center gap-1.5">
                  <Users className="h-4 w-4 text-accent" />
@@ -258,98 +281,42 @@ export default function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
-          <aside className="lg:col-span-1 space-y-6">
-            <Card className="shadow-sm border-none bg-primary/5 overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Map className="h-4 w-4 text-primary" />
-                  Geospatial Focus
-                </CardTitle>
-                <CardDescription className="text-[10px]">Active needs per region</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <ChartContainer config={chartConfig} className="h-[200px] w-full">
-                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -20 }}>
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tickLine={false} 
-                      axisLine={false}
-                      className="text-[10px] font-bold"
-                    />
-                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Bar dataKey="tasks" radius={4}>
-                      {areaImpact.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ChartContainer>
-                
-                <div className="mt-6 space-y-2">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-3">Regional Explorer</p>
-                  <Button 
-                    variant={locationFilter === 'all' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    className="w-full justify-start text-xs h-8"
-                    onClick={() => setLocationFilter('all')}
-                  >
-                    <Activity className="h-3 w-3 mr-2" /> Global View
-                  </Button>
-                  {areaImpact.map((area) => (
-                    <Button 
-                      key={area.name}
-                      variant={locationFilter === area.name ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className="w-full justify-between text-xs h-8"
-                      onClick={() => setLocationFilter(area.name)}
-                    >
-                      <span className="flex items-center">
-                        <MapPin className="h-3 w-3 mr-2" /> {area.name}
-                      </span>
-                      <Badge variant="outline" className="text-[9px] h-4 px-1">{area.tasks}</Badge>
-                    </Button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none shadow-sm bg-accent/5">
-               <CardHeader className="pb-2">
-                 <CardTitle className="text-xs font-bold uppercase text-accent">Strategic Alerts</CardTitle>
-               </CardHeader>
-               <CardContent className="space-y-4">
-                  {areaImpact[0] && (
-                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border-l-4 border-red-500 shadow-sm">
-                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-bold">{areaImpact[0].name} Critical</p>
-                        <p className="text-[10px] text-muted-foreground">Highest concentration of emergency needs detected here.</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-500 shadow-sm">
-                    <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Efficiency Log</p>
-                    <p className="text-[10px] text-emerald-600 leading-tight">
-                      Once a task is fulfilled, it is automatically marked as completed and removed from active matching.
-                    </p>
+          <div className="lg:col-span-3 space-y-8">
+            <Card className="border-none shadow-xl overflow-hidden min-h-[450px] relative">
+              <InteractiveMap 
+                tasks={rawTasks || []} 
+                volunteers={rawVolunteers || []} 
+                center={mapCenter} 
+                zoom={mapZoom}
+              />
+              <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border text-[10px] font-bold uppercase space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500 border border-white" /> High Urgency Task
                   </div>
-               </CardContent>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-amber-500 border border-white" /> Medium Urgency Task
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white" /> Low Urgency Task
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 border border-white" /> Registered Rescuer
+                  </div>
+                </div>
+              </div>
             </Card>
-          </aside>
 
-          <div className="lg:col-span-3">
              <Tabs defaultValue="matches" className="space-y-8">
                <div className="flex justify-between items-center">
                  <TabsList className="grid w-full grid-cols-3 max-w-md h-12 bg-muted p-1 rounded-xl">
-                   <TabsTrigger value="matches" className="rounded-lg data-[state=active]:shadow-sm">Smart Matches</TabsTrigger>
-                   <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:shadow-sm">Incident Feed</TabsTrigger>
-                   <TabsTrigger value="volunteers" className="rounded-lg data-[state=active]:shadow-sm">Rescuers</TabsTrigger>
+                   <TabsTrigger value="matches" className="rounded-lg">Smart Matches</TabsTrigger>
+                   <TabsTrigger value="tasks" className="rounded-lg">Incident Feed</TabsTrigger>
+                   <TabsTrigger value="volunteers" className="rounded-lg">Rescuers</TabsTrigger>
                  </TabsList>
                  {locationFilter !== 'all' && (
-                   <Badge variant="secondary" className="gap-1 animate-in fade-in slide-in-from-right-2">
-                     <MapPin className="h-3 w-3" /> Filtering: {locationFilter}
+                   <Badge variant="secondary" className="gap-1">
+                     <MapPin className="h-3 w-3" /> Area: {locationFilter}
                    </Badge>
                  )}
                </div>
@@ -358,17 +325,14 @@ export default function Dashboard() {
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {matches.length > 0 ? (
                      matches.filter(m => locationFilter === 'all' || m.reasons.some(r => r === "Geographic Proximity")).slice(0, 9).map((match, i) => (
-                       <Card key={`${match.taskId}-${match.volunteerId}`} className="relative border-none shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 bg-card group flex flex-col">
+                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card group flex flex-col">
                          <div className="absolute top-0 right-0 p-4">
                            <div className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
                              <Zap className="h-3 w-3" /> {match.score} Score
                            </div>
                          </div>
                          <CardHeader className="pb-2">
-                           <CardTitle className="text-lg flex items-center gap-2 font-bold">
-                             Recommendation
-                           </CardTitle>
-                           <CardDescription>Strategic pairing</CardDescription>
+                           <CardTitle className="text-lg flex items-center gap-2 font-bold">Pairing</CardTitle>
                          </CardHeader>
                          <CardContent className="space-y-4 flex-grow">
                            <div className="p-3 bg-muted/30 rounded-xl">
@@ -379,33 +343,18 @@ export default function Dashboard() {
                              <p className="text-[10px] font-bold text-primary uppercase mb-1">Assigned Candidate</p>
                              <p className="font-bold text-foreground">{match.volunteerName}</p>
                            </div>
-                           <div className="flex flex-wrap gap-2 pt-2">
-                             {match.reasons.map((r, idx) => (
-                               <Badge key={idx} variant="outline" className={cn(
-                                 "text-[10px] bg-white/50",
-                                 r === "Geographic Proximity" ? "border-accent text-accent font-bold" : "border-primary/20"
-                               )}>
-                                 {r}
-                               </Badge>
-                             ))}
-                           </div>
                          </CardContent>
                          <CardFooter className="pt-2">
-                            <Button 
-                              className="w-full gap-2" 
-                              size="sm"
-                              onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}
-                            >
-                              <CheckCircle2 className="h-4 w-4" /> Assign Volunteer
+                            <Button className="w-full gap-2" size="sm" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
+                              <CheckCircle2 className="h-4 w-4" /> Assign
                             </Button>
                          </CardFooter>
                        </Card>
                      ))
                    ) : (
-                     <div className="col-span-full py-32 text-center bg-card rounded-3xl border-2 border-dashed">
-                       <Zap className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                       <h3 className="text-xl font-bold">No High-Confidence Matches</h3>
-                       <p className="text-muted-foreground mt-1">Register more rescuers or tasks to see recommendations.</p>
+                     <div className="col-span-full py-20 text-center bg-card rounded-3xl border-2 border-dashed">
+                       <Zap className="h-10 w-10 text-muted-foreground/30 mx-auto mb-4" />
+                       <h3 className="text-lg font-bold text-muted-foreground">No matches detected.</h3>
                      </div>
                    )}
                  </div>
@@ -414,96 +363,111 @@ export default function Dashboard() {
                <TabsContent value="tasks" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {filteredTasks.map(task => (
-                     <Card key={task.id} className={cn(
-                       "border-none shadow-sm hover:shadow-md transition-shadow bg-card relative",
-                       task.status === 'completed' && "opacity-60"
-                     )}>
-                       {task.status === 'completed' && (
-                         <div className="absolute top-2 right-2">
-                           <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">Completed</Badge>
-                         </div>
-                       )}
+                     <Card key={task.id} className={cn("border-none shadow-sm bg-card relative", task.status === 'completed' && "opacity-60")}>
                        <CardHeader className="pb-2">
-                         <div className="flex justify-between items-start mb-3">
-                           <Badge className={cn(
-                             "text-[10px] uppercase font-bold px-2 py-0.5",
-                             task.urgency === 'high' ? "bg-red-500 hover:bg-red-600" : 
-                             task.urgency === 'medium' ? "bg-amber-500 hover:bg-amber-600" : 
-                             "bg-emerald-500 hover:bg-emerald-600"
-                           )}>
-                             {task.urgency} Urgency
+                         <div className="flex justify-between items-start mb-2">
+                           <Badge className={cn("text-[10px] uppercase font-bold", 
+                             task.urgency === 'high' ? "bg-red-500" : 
+                             task.urgency === 'medium' ? "bg-amber-500" : "bg-emerald-500")}>
+                             {task.urgency}
                            </Badge>
                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
-                             <MapPin className="h-3.5 w-3.5" /> {task.location}
+                             <MapPin className="h-3 w-3" /> {task.location}
                            </div>
                          </div>
-                         <CardTitle className="text-xl font-bold font-headline leading-tight tracking-tight">{task.title}</CardTitle>
+                         <CardTitle className="text-lg font-bold truncate">{task.title}</CardTitle>
                        </CardHeader>
                        <CardContent className="space-y-4 pt-2">
-                         <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{task.description}</p>
-                         <div className="flex flex-wrap gap-2">
-                           {task.skillsRequired.map((skill, idx) => (
-                             <Badge key={idx} variant="secondary" className="text-[10px] font-medium bg-muted text-muted-foreground border-none">
-                               {skill}
-                             </Badge>
-                           ))}
-                         </div>
-                         {task.status === 'assigned' && (
-                           <div className="p-2 bg-blue-50 text-blue-700 text-xs rounded-lg font-bold">
-                             Currently Assigned
-                           </div>
-                         )}
+                         <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
                        </CardContent>
-                       {task.status === 'open' || task.status === 'assigned' ? (
-                         <CardFooter className="pt-0">
-                           <Button 
-                             variant="ghost" 
-                             size="sm" 
-                             className="w-full text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                             onClick={() => handleMarkAsCompleted(task.id)}
-                           >
-                             <CheckCircle className="h-3 w-3 mr-2" /> Mark Completed
-                           </Button>
-                         </CardFooter>
-                       ) : null}
+                       <CardFooter className="pt-0 flex gap-2">
+                         <Button variant="ghost" size="sm" className="flex-1 text-xs" onClick={() => handleMarkAsCompleted(task.id)}>
+                           <CheckCircle className="h-3 w-3 mr-2" /> Complete
+                         </Button>
+                         <Button variant="outline" size="sm" className="text-xs" onClick={() => { setMapCenter([task.latitude, task.longitude]); setMapZoom(15); }}>
+                           <MapIcon className="h-3 w-3" /> View
+                         </Button>
+                       </CardFooter>
                      </Card>
                    ))}
-                   {filteredTasks.length === 0 && (
-                     <div className="col-span-full py-20 text-center text-muted-foreground">
-                       No tasks found in {locationFilter}.
-                     </div>
-                   )}
                  </div>
                </TabsContent>
-
+               
                <TabsContent value="volunteers" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {sortedVolunteers.filter(v => locationFilter === 'all' || v.location === locationFilter).map(volunteer => (
                      <Card key={volunteer.id} className="border-none shadow-sm bg-card">
                        <CardHeader className="pb-2">
-                         <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold mb-3">
-                           <MapPin className="h-3.5 w-3.5 text-accent" /> {volunteer.location}
+                         <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold mb-2">
+                           <MapPin className="h-3 w-3 text-accent" /> {volunteer.location}
                          </div>
-                         <CardTitle className="text-xl font-bold font-headline">{volunteer.name}</CardTitle>
+                         <CardTitle className="text-lg font-bold">{volunteer.name}</CardTitle>
                        </CardHeader>
-                       <CardContent className="space-y-5 pt-2">
-                         <div className="space-y-3">
-                           <p className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest">Qualified Expertise</p>
-                           <div className="flex flex-wrap gap-2">
-                             {volunteer.skills.map((skill, idx) => (
-                               <Badge key={idx} className="bg-accent/10 text-accent hover:bg-accent/20 border-none font-semibold px-3 py-1">
-                                 {skill}
-                               </Badge>
-                             ))}
-                           </div>
+                       <CardContent className="space-y-4 pt-2">
+                         <div className="flex flex-wrap gap-2">
+                           {volunteer.skills.map((skill, idx) => (
+                             <Badge key={idx} variant="secondary" className="text-[10px]">{skill}</Badge>
+                           ))}
                          </div>
                        </CardContent>
+                       <CardFooter className="pt-0">
+                         <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { setMapCenter([volunteer.latitude, volunteer.longitude]); setMapZoom(15); }}>
+                           <MapIcon className="h-3 w-3 mr-2" /> Locate
+                         </Button>
+                       </CardFooter>
                      </Card>
                    ))}
                  </div>
                </TabsContent>
              </Tabs>
           </div>
+
+          <aside className="lg:col-span-1 space-y-6">
+            <Card className="shadow-sm border-none bg-primary/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Regional Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <ChartContainer config={chartConfig} className="h-[180px] w-full">
+                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -20 }}>
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[10px] font-bold" />
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <Bar dataKey="tasks" radius={4}>
+                      {areaImpact.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+                
+                <div className="mt-6 space-y-1">
+                  <Button variant={locationFilter === 'all' ? 'default' : 'ghost'} size="sm" className="w-full justify-start text-xs h-8" onClick={() => setLocationFilter('all')}>
+                    <Activity className="h-3 w-3 mr-2" /> Global View
+                  </Button>
+                  {areaImpact.map((area) => (
+                    <Button key={area.name} variant={locationFilter === area.name ? 'secondary' : 'ghost'} size="sm" className="w-full justify-between text-xs h-8" onClick={() => setLocationFilter(area.name)}>
+                      <span className="flex items-center"><MapPin className="h-3 w-3 mr-2" /> {area.name}</span>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">{area.tasks}</Badge>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm bg-accent/5">
+               <CardHeader className="pb-2">
+                 <CardTitle className="text-xs font-bold uppercase text-accent">Status Update</CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                  <div className="p-3 bg-white rounded-lg border-l-4 border-emerald-500 shadow-sm text-[11px] leading-relaxed">
+                    Once a task is fulfilled, it is automatically marked as completed and removed from active matching, ensuring efficient resource utilization.
+                  </div>
+               </CardContent>
+            </Card>
+          </aside>
         </div>
       </main>
     </div>

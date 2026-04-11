@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, Sparkles, AlertCircle } from "lucide-react";
+import { ClipboardList, Sparkles, AlertCircle, MapPin } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,8 @@ export default function NewTask() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [lat, setLat] = useState("19.0760");
+  const [lng, setLng] = useState("72.8777");
   const [urgency, setUrgency] = useState("medium");
   const [skillsRequired, setSkillsRequired] = useState("");
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -38,20 +41,15 @@ export default function NewTask() {
       const result = await smartTaskDescriptionAssistant({ taskDescription: description });
       setDescription(result.enhancedTaskDescription);
       toast({ title: "Enhanced!", description: "AI has updated your task description to be more engaging." });
-    } catch (error) {
-      // Error handled by FirebaseErrorListener
-    } finally {
+    } catch (error) { } finally {
       setIsEnhancing(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !user) {
-      toast({ variant: "destructive", title: "Wait a moment", description: "Your session is initializing." });
-      return;
-    }
-    if (!title || !description || !location || !skillsRequired) {
+    if (!db || !user) return;
+    if (!title || !description || !location || !lat || !lng) {
       toast({ variant: "destructive", title: "Missing fields", description: "Please fill in all details." });
       return;
     }
@@ -66,21 +64,21 @@ export default function NewTask() {
         title,
         description,
         location,
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
         urgency,
         priority,
         skillsRequired: skillsRequired.split(",").map(s => s.trim()).filter(s => s !== ""),
         status: "open",
         ownerId: user.uid,
-        submittedBy: user.displayName || "Community Member",
+        submittedBy: user.displayName || "NGO Partner",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
       
-      toast({ title: "Success!", description: "Your task has been posted." });
+      toast({ title: "Success!", description: "Task pinned to operational map." });
       router.push("/dashboard");
-    } catch (error) {
-      // Error handled by FirebaseErrorListener
-    } finally {
+    } catch (error) { } finally {
       setLoading(false);
     }
   };
@@ -96,88 +94,57 @@ export default function NewTask() {
               <span className="font-semibold uppercase tracking-wider text-xs">Request Support</span>
             </div>
             <CardTitle className="text-3xl font-bold font-headline">Post a New Task</CardTitle>
-            <CardDescription>
-              Let our community know what you need. Be as specific as possible.
-            </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Task Title</Label>
-                <Input 
-                  id="title" 
-                  placeholder="e.g. Community Garden Cleanup" 
-                  value={title} 
-                  onChange={e => setTitle(e.target.value)} 
-                  required
-                />
+                <Input id="title" placeholder="e.g. Water Distribution Hub" value={title} onChange={e => setTitle(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-end">
                   <Label htmlFor="description">Detailed Description</Label>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-xs h-8 text-accent hover:text-accent hover:bg-accent/10"
-                    onClick={handleEnhance}
-                    disabled={isEnhancing}
-                  >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    {isEnhancing ? "Enhancing..." : "Improve with AI"}
+                  <Button type="button" variant="ghost" size="sm" className="text-xs text-accent" onClick={handleEnhance} disabled={isEnhancing}>
+                    <Sparkles className="h-3 w-3 mr-1" /> {isEnhancing ? "Enhancing..." : "AI Improve"}
                   </Button>
                 </div>
-                <Textarea 
-                  id="description" 
-                  placeholder="Describe the task, its purpose, and what needs to be done..." 
-                  className="min-h-[120px]"
-                  value={description} 
-                  onChange={e => setDescription(e.target.value)} 
-                  required
-                />
+                <Textarea id="description" placeholder="What is needed..." className="min-h-[100px]" value={description} onChange={e => setDescription(e.target.value)} required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input 
-                    id="location" 
-                    placeholder="e.g. Green Park" 
-                    value={location} 
-                    onChange={e => setLocation(e.target.value)} 
-                    required
-                  />
+                  <Label htmlFor="location">Area Name</Label>
+                  <Input id="location" placeholder="e.g. South Port" value={location} onChange={e => setLocation(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="urgency">Urgency Level</Label>
+                  <Label htmlFor="urgency">Urgency</Label>
                   <Select value={urgency} onValueChange={setUrgency}>
-                    <SelectTrigger id="urgency">
-                      <SelectValue placeholder="Select level" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Urgency" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low Priority</SelectItem>
-                      <SelectItem value="medium">Medium Priority</SelectItem>
-                      <SelectItem value="high">High Priority</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lat">Latitude</Label>
+                  <Input id="lat" type="number" step="any" value={lat} onChange={e => setLat(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lng">Longitude</Label>
+                  <Input id="lng" type="number" step="any" value={lng} onChange={e => setLng(e.target.value)} required />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="skills">Required Skills (comma separated)</Label>
-                <Input 
-                  id="skills" 
-                  placeholder="e.g. Gardening, Heavy Lifting" 
-                  value={skillsRequired} 
-                  onChange={e => setSkillsRequired(e.target.value)} 
-                  required
-                />
-                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" /> Separate skills with commas for better matching.
-                </p>
+                <Label htmlFor="skills">Required Skills (commas)</Label>
+                <Input id="skills" placeholder="e.g. Healthcare, Driving" value={skillsRequired} onChange={e => setSkillsRequired(e.target.value)} required />
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full bg-primary h-12 text-lg" disabled={loading}>
-                {loading ? "Posting..." : "Post Task"}
+              <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                {loading ? "Deploying..." : "Post to Command Center"}
               </Button>
             </CardFooter>
           </form>

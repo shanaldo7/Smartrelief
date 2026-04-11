@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react";
@@ -7,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserPlus, CheckCircle2 } from "lucide-react";
+import { UserPlus, MapPin } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 const SKILLS = [
-  "General Labor", "Teaching", "Healthcare", "Tech Support", "Cooking", "Driving", "Gardening", "Cleaning", "Admin"
+  "General Labor", "Healthcare", "Tech Support", "Cooking", "Driving", "Admin", "Logistics"
 ];
 
 export default function NewVolunteer() {
@@ -22,6 +23,8 @@ export default function NewVolunteer() {
   const { user } = useUser();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [lat, setLat] = useState("19.0760");
+  const [lng, setLng] = useState("72.8777");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -35,11 +38,8 @@ export default function NewVolunteer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !user) {
-      toast({ variant: "destructive", title: "Wait a moment", description: "Your session is initializing." });
-      return;
-    }
-    if (!name || !location || selectedSkills.length === 0) {
+    if (!db || !user) return;
+    if (!name || !location || selectedSkills.length === 0 || !lat || !lng) {
       toast({ variant: "destructive", title: "Missing fields", description: "Please fill in all details." });
       return;
     }
@@ -52,16 +52,16 @@ export default function NewVolunteer() {
         name,
         email: user.email || "",
         location,
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lng),
         skills: selectedSkills,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      toast({ title: "Success!", description: "Your volunteer profile has been created." });
+      toast({ title: "Success!", description: "You are now active on the responder map." });
       router.push("/dashboard");
-    } catch (error) {
-      // Error handled by FirebaseErrorListener
-    } finally {
+    } catch (error) { } finally {
       setLoading(false);
     }
   };
@@ -77,42 +77,33 @@ export default function NewVolunteer() {
               <span className="font-semibold uppercase tracking-wider text-xs">Join our mission</span>
             </div>
             <CardTitle className="text-3xl font-bold font-headline">Volunteer Profile</CardTitle>
-            <CardDescription>
-              Tell us a bit about yourself and what you can offer. We'll match you with the right opportunities.
-            </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="Enter your name" 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  required
-                />
+                <Input id="name" placeholder="Enter your name" value={name} onChange={e => setName(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="location">Your Location (City/Neighborhood)</Label>
-                <Input 
-                  id="location" 
-                  placeholder="e.g. Downtown, Brooklyn" 
-                  value={location} 
-                  onChange={e => setLocation(e.target.value)} 
-                  required
-                />
+                <Label htmlFor="location">Area Name</Label>
+                <Input id="location" placeholder="e.g. Downtown" value={location} onChange={e => setLocation(e.target.value)} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="lat">Latitude</Label>
+                  <Input id="lat" type="number" step="any" value={lat} onChange={e => setLat(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lng">Longitude</Label>
+                  <Input id="lng" type="number" step="any" value={lng} onChange={e => setLng(e.target.value)} required />
+                </div>
               </div>
               <div className="space-y-3">
-                <Label>Your Key Skills</Label>
+                <Label>Your Expertise</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {SKILLS.map(skill => (
-                    <div key={skill} className="flex items-center space-x-2 border rounded-lg p-2 hover:bg-muted transition-colors cursor-pointer">
-                      <Checkbox 
-                        id={`skill-${skill}`} 
-                        checked={selectedSkills.includes(skill)}
-                        onCheckedChange={() => handleSkillToggle(skill)}
-                      />
+                    <div key={skill} className="flex items-center space-x-2 border rounded-lg p-2 hover:bg-muted cursor-pointer">
+                      <Checkbox id={`skill-${skill}`} checked={selectedSkills.includes(skill)} onCheckedChange={() => handleSkillToggle(skill)} />
                       <Label htmlFor={`skill-${skill}`} className="flex-grow cursor-pointer">{skill}</Label>
                     </div>
                   ))}
@@ -120,8 +111,8 @@ export default function NewVolunteer() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button type="submit" className="w-full bg-primary h-12 text-lg" disabled={loading}>
-                {loading ? "Saving..." : "Create Profile"}
+              <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+                {loading ? "Registering..." : "Activate Profile"}
               </Button>
             </CardFooter>
           </form>

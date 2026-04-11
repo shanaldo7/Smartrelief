@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "VolunteerProfile": {
@@ -30,6 +31,14 @@
           "type": "string",
           "description": "The geographical location of the volunteer."
         },
+        "latitude": {
+          "type": "number",
+          "description": "The latitude coordinate for map visualization."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The longitude coordinate for map visualization."
+        },
         "availability": {
           "type": "string",
           "description": "General availability of the volunteer (e.g., 'weekends', 'evenings', 'flexible')."
@@ -51,6 +60,8 @@
         "email",
         "skills",
         "location",
+        "latitude",
+        "longitude",
         "createdAt"
       ]
     },
@@ -82,6 +93,14 @@
         "location": {
           "type": "string",
           "description": "The geographical location where the task needs to be performed."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The latitude coordinate for map visualization."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The longitude coordinate for map visualization."
         },
         "urgency": {
           "type": "string",
@@ -121,6 +140,8 @@
         "description",
         "skillsRequired",
         "location",
+        "latitude",
+        "longitude",
         "urgency",
         "priority",
         "status",
@@ -195,11 +216,11 @@
           "schema": {
             "$ref": "#/backend/entities/VolunteerProfile"
           },
-          "description": "Stores individual volunteer profiles. The document ID is the user's UID (volunteerId). Includes denormalized 'id' field matching the document ID for rule validation. Access: Read by all authenticated users (for matching), write/update/delete only by the owner.",
+          "description": "Stores individual volunteer profiles.",
           "params": [
             {
               "name": "volunteerId",
-              "description": "The unique ID of the volunteer, which is also the user's Firebase Authentication UID."
+              "description": "The unique ID of the volunteer."
             }
           ]
         }
@@ -211,7 +232,7 @@
           "schema": {
             "$ref": "#/backend/entities/Task"
           },
-          "description": "Stores task details. Each task includes an 'ownerId' field (the UID of the user who created it) for write authorization. The 'id' field matches the document ID. Access: Read by all authenticated users (for dashboard, matching), write/update/delete only by the owner.",
+          "description": "Stores task details.",
           "params": [
             {
               "name": "taskId",
@@ -227,7 +248,7 @@
           "schema": {
             "$ref": "#/backend/entities/Match"
           },
-          "description": "Records proposed or confirmed volunteer-to-task pairings. Includes 'volunteerId' and denormalized 'taskOwnerId' to enable Authorization Independence without 'get()' calls in security rules. The 'id' field matches the document ID. Access: Read by the associated volunteer or task owner, write/update (e.g., status changes) by the volunteer or admin.",
+          "description": "Records volunteer-to-task pairings.",
           "params": [
             {
               "name": "matchId",
@@ -235,24 +256,7 @@
             }
           ]
         }
-      },
-      {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "Admin",
-          "schema": {
-            "$ref": "#/backend/entities/VolunteerProfile"
-          },
-          "description": "A collection for Database Access Control (DBAC). The existence of a document at this path signifies that 'adminId' (which is the user's UID) has administrative privileges. Used for enforcing global roles, e.g., for data import actions. No specific schema, existence is the key.",
-          "params": [
-            {
-              "name": "adminId",
-              "description": "The unique ID of an administrator, which is their Firebase Authentication UID."
-            }
-          ]
-        }
       }
-    ],
-    "reasoning": "The recommended Firestore structure prioritizes secure, scalable, and debuggable authorization by strictly adhering to Authorization Independence and Structural Segregation principles. Each core entity—VolunteerProfile, Task, and Match—is housed in its own top-level collection, ensuring homogeneous security requirements within each collection.\n\n1.  **Volunteer Profiles (`/volunteerProfiles/{volunteerId}`):**\n    *   **Justification:** Volunteer profiles are treated as private data, primarily owned by the individual volunteer. The document ID (`volunteerId`) is designed to directly correspond to the Firebase `request.auth.uid` of the logged-in user. This provides direct path-based ownership, making security rules extremely simple: `allow read, update, delete: if request.auth.uid == volunteerId;`. For the matching system to function, these profiles must be queryable by other authenticated users, but their modification is restricted to the owner.\n    *   **Authorization Independence:** Achieved inherently as the document's ID is the authorization key. No `get()` calls are needed to determine ownership.\n    *   **QAPs (Queryable Authorization Patterns):** Supports querying all profiles by the matching system (which may have elevated privileges or simply iterate over publicly readable (by authenticated users) data) or specific profiles by `volunteerId`.\n\n2.  **Tasks (`/tasks/{taskId}`):**\n    *   **Justification:** Tasks are intended to be broadly visible for volunteers and the dashboard ("
+    ]
   }
 }
