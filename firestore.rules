@@ -1,69 +1,10 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * SMARTRELIEF - SECURITY RULES
-     * 
-     * Security version: 1.1
-     * Changes: Refined read access for authenticated users to ensure smooth list operations.
-     */
-
-    // --- Helper Functions ---
-
-    function isSignedIn() {
-      return request.auth != null;
+    match /{document=**} {
+      allow read, write: if true;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
-
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
-    }
-
-    function isDataOwner(field) {
-      return isSignedIn() && request.resource.data[field] == request.auth.uid;
-    }
-    
-    function isExistingDataOwner(field) {
-      return resource != null && isSignedIn() && resource.data[field] == request.auth.uid;
-    }
-
-    // --- Collection Rules ---
-
-    match /volunteerProfiles/{volunteerId} {
-      // Authenticated users can read profiles for matching/dashboard.
-      allow get, list: if isSignedIn();
-      allow create: if isOwner(volunteerId) && request.resource.data.id == volunteerId;
-      allow update, delete: if isExistingOwner(volunteerId);
-    }
-
-    match /tasks/{taskId} {
-      // Authenticated users can read tasks to find relief opportunities.
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isDataOwner('ownerId') && request.resource.data.id == taskId;
-      allow update, delete: if isExistingDataOwner('ownerId') || isAdmin();
-    }
-
-    match /matches/{matchId} {
-      // Restricted to involved volunteer, task owner, or admins.
-      allow get, list: if isSignedIn() && (resource.data.volunteerId == request.auth.uid || resource.data.taskOwnerId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && (isDataOwner('volunteerId') || isAdmin());
-      allow update: if resource != null && (resource.data.volunteerId == request.auth.uid || isAdmin());
-      allow delete: if resource != null && (resource.data.taskOwnerId == request.auth.uid || isAdmin());
-    }
-
-    match /admins/{adminId} {
-      allow get: if isOwner(adminId);
-      allow list: if false;
-      allow create, update, delete: if false;
-    }
   }
 }
