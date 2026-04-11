@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -121,6 +121,10 @@ export default function Dashboard() {
     return rawTasks?.filter(t => t.status === 'open') || [];
   }, [rawTasks]);
 
+  const stableVolunteers = useMemo(() => {
+    return rawVolunteers || [];
+  }, [rawVolunteers]);
+
   const filteredTasks = useMemo(() => {
     if (!rawTasks) return [];
     let filtered = [...rawTasks];
@@ -224,7 +228,7 @@ export default function Dashboard() {
       .sort((a, b) => b.tasks - a.tasks);
   }, [rawTasks]);
 
-  const handleTaskSelect = (taskId: string | null) => {
+  const handleTaskSelect = useCallback((taskId: string | null) => {
     setSelectedTaskId(taskId);
     if (taskId) {
       const task = rawTasks?.find(t => t.id === taskId);
@@ -233,9 +237,9 @@ export default function Dashboard() {
         setMapZoom(15);
       }
     }
-  };
+  }, [rawTasks]);
 
-  const handleRegionClick = (regionName: string) => {
+  const handleRegionClick = useCallback((regionName: string) => {
     setLocationFilter(regionName);
     setSelectedTaskId(null);
     if (regionName === 'all') {
@@ -249,9 +253,9 @@ export default function Dashboard() {
       setMapCenter([regionalTask.latitude, regionalTask.longitude]);
       setMapZoom(12);
     }
-  };
+  }, [rawTasks]);
 
-  const handleLocateMe = () => {
+  const handleLocateMe = useCallback(() => {
     if (!navigator.geolocation) {
       toast({ variant: "destructive", title: "Access Denied", description: "Geolocation services are required." });
       return;
@@ -273,9 +277,9 @@ export default function Dashboard() {
       },
       { enableHighAccuracy: true }
     );
-  };
+  }, [toast]);
 
-  const handleFetchNGOData = async () => {
+  const handleFetchNGOData = useCallback(async () => {
     if (!db || !user) return;
     setIsImporting(true);
     try {
@@ -293,9 +297,9 @@ export default function Dashboard() {
     } catch (error) { } finally {
       setIsImporting(false);
     }
-  };
+  }, [db, user, toast]);
 
-  const handleAssignVolunteer = (taskId: string, volunteerName: string) => {
+  const handleAssignVolunteer = useCallback((taskId: string, volunteerName: string) => {
     if (!db) return;
     const taskRef = doc(db, "tasks", taskId);
     updateDocumentNonBlocking(taskRef, {
@@ -304,9 +308,9 @@ export default function Dashboard() {
       updatedAt: serverTimestamp(),
     });
     toast({ title: "Mission Assigned", description: `${volunteerName} has been deployed.` });
-  };
+  }, [db, toast]);
 
-  const handleMarkAsCompleted = (taskId: string) => {
+  const handleMarkAsCompleted = useCallback((taskId: string) => {
     if (!db) return;
     const taskRef = doc(db, "tasks", taskId);
     updateDocumentNonBlocking(taskRef, {
@@ -315,7 +319,7 @@ export default function Dashboard() {
     });
     if (selectedTaskId === taskId) setSelectedTaskId(null);
     toast({ title: "Mission Successful", description: `Field request resolved.` });
-  };
+  }, [db, selectedTaskId, toast]);
 
   if (isUserLoading || tasksLoading || volunteersLoading) {
     return (
@@ -391,7 +395,7 @@ export default function Dashboard() {
             <Card className="border-2 shadow-2xl overflow-hidden h-[500px] relative bg-card rounded-3xl">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
-                volunteers={rawVolunteers || []} 
+                volunteers={stableVolunteers} 
                 center={mapCenter} 
                 zoom={mapZoom}
                 userLocation={userLocation}
@@ -688,4 +692,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
