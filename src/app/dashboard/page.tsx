@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useCallback } from "react";
@@ -8,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
-import { collection, serverTimestamp, doc, query, orderBy, limit } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Activity, Loader2, BarChart3, CheckCircle, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck } from "lucide-react";
+import { collection, serverTimestamp, doc, query, orderBy, limit, deleteField } from "firebase/firestore";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Activity, Loader2, BarChart3, CheckCircle, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck, UserMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -130,7 +131,7 @@ export default function Dashboard() {
 
   const activeTasksForMap = useMemo(() => {
     if (!rawTasks) return EMPTY_ARRAY;
-    return rawTasks.filter(t => t.status === 'open');
+    return rawTasks.filter(t => t.status !== 'completed');
   }, [rawTasks]);
 
   const filteredTasks = useMemo(() => {
@@ -272,6 +273,19 @@ export default function Dashboard() {
     toast({ title: "Responder Deployed", description: `${volunteerName} is en route.` });
   }, [db, toast, rawTasks, logActivity]);
 
+  const handleRemoveResponder = useCallback((taskId: string) => {
+    if (!db) return;
+    const task = rawTasks?.find(t => t.id === taskId);
+    const taskRef = doc(db, "tasks", taskId);
+    updateDocumentNonBlocking(taskRef, {
+      status: "open",
+      assignedTo: deleteField(),
+      updatedAt: serverTimestamp(),
+    });
+    logActivity("completed", `Personnel recalled from: ${task?.title}`);
+    toast({ title: "Responder Recalled", description: "Mission status reverted to open." });
+  }, [db, toast, rawTasks, logActivity]);
+
   const handleMarkAsCompleted = useCallback((taskId: string) => {
     if (!db) return;
     const task = rawTasks?.find(t => t.id === taskId);
@@ -363,7 +377,6 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-9 space-y-8">
-            {/* Professional Filter Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-card p-6 rounded-2xl border shadow-sm items-end">
                <div className="space-y-2">
                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Relief Sector</Label>
@@ -456,7 +469,7 @@ export default function Dashboard() {
 
                 <TabsContent value="missions" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredTasks.map(task => (
-                    <Card key={task.id} className={cn("border-2 shadow-sm bg-card rounded-2xl overflow-hidden group", task.status === 'completed' && "opacity-40 grayscale")}>
+                    <Card key={task.id} className={cn("border-2 shadow-sm bg-card rounded-2xl overflow-hidden group flex flex-col h-full", task.status === 'completed' && "opacity-40 grayscale")}>
                       <CardHeader className="p-5">
                         <div className="flex justify-between items-center mb-4">
                           <Badge className={cn("text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded-lg", 
@@ -469,7 +482,7 @@ export default function Dashboard() {
                         </div>
                         <CardTitle className="text-lg font-bold leading-tight truncate">{task.title}</CardTitle>
                       </CardHeader>
-                      <CardContent className="p-5 pt-0 space-y-4">
+                      <CardContent className="p-5 pt-0 space-y-4 flex-grow">
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium italic">"{task.description}"</p>
                         {task.assignedTo && (
                           <div className="pt-3 border-t flex items-center gap-2">
@@ -478,15 +491,22 @@ export default function Dashboard() {
                           </div>
                         )}
                       </CardContent>
-                      <CardFooter className="p-5 pt-0 flex gap-2">
-                         {task.status !== 'completed' && (
-                           <Button variant="ghost" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border" onClick={() => handleMarkAsCompleted(task.id)}>
-                             Complete
+                      <CardFooter className="p-5 pt-0 flex flex-col gap-2">
+                         <div className="flex w-full gap-2">
+                           <Button variant="outline" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border-2" onClick={() => handleTaskSelect(task.id)}>
+                             <Route className="h-3.5 w-3.5 mr-1" /> Plot Route
+                           </Button>
+                           {task.status !== 'completed' && (
+                             <Button variant="ghost" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border" onClick={() => handleMarkAsCompleted(task.id)}>
+                               Complete
+                             </Button>
+                           )}
+                         </div>
+                         {task.assignedTo && (
+                           <Button variant="destructive" size="sm" className="w-full h-8 text-[8px] font-bold uppercase tracking-widest rounded-lg gap-1.5" onClick={() => handleRemoveResponder(task.id)}>
+                             <UserMinus className="h-3 w-3" /> Remove Responder
                            </Button>
                          )}
-                         <Button variant="outline" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border-2" onClick={() => handleTaskSelect(task.id)}>
-                           Track Site
-                         </Button>
                       </CardFooter>
                     </Card>
                   ))}
@@ -539,12 +559,33 @@ export default function Dashboard() {
                      </div>
                    )}
                  </TabsContent>
+
+                 <TabsContent value="assignments">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {rawTasks?.filter(t => t.assignedTo && (t.assignedTo === user?.displayName || t.assignedTo === 'Anonymous')).map(task => (
+                        <Card key={task.id} className="border-2 rounded-2xl overflow-hidden">
+                           <CardHeader className="p-6">
+                             <div className="flex justify-between items-center mb-4">
+                               <Badge className="bg-accent text-white uppercase text-[9px] font-bold tracking-widest">Active Mission</Badge>
+                               <span className="text-[10px] font-bold uppercase text-muted-foreground">{task.location}</span>
+                             </div>
+                             <CardTitle className="text-xl font-bold uppercase">{task.title}</CardTitle>
+                           </CardHeader>
+                           <CardContent className="px-6 pb-6">
+                             <p className="text-sm text-muted-foreground italic mb-6">"{task.description}"</p>
+                             <Button className="w-full h-12 rounded-xl font-bold uppercase text-[11px] tracking-widest gap-2" onClick={() => handleTaskSelect(task.id)}>
+                               <Route className="h-4 w-4" /> Tactical Path
+                             </Button>
+                           </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                 </TabsContent>
               </Tabs>
             )}
           </div>
 
           <aside className="lg:col-span-3 space-y-8">
-            {/* Live Operational Feed */}
             <Card className="shadow-lg border-2 bg-card rounded-3xl overflow-hidden">
                <CardHeader className="bg-muted/30 border-b p-6">
                  <CardTitle className="text-xs font-bold flex items-center gap-3 text-primary uppercase tracking-widest">

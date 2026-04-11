@@ -20,7 +20,6 @@ interface MapProps {
   selectedTaskId?: string | null;
 }
 
-// Inline SVGs for consistent icon rendering in dynamic chunks
 const MapPinIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
@@ -41,9 +40,8 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
   useEffect(() => {
     if (routeBounds) {
       const currentBounds = map.getBounds();
-      // Only fit bounds if they represent a genuine tactical shift
       if (!currentBounds.equals(routeBounds)) {
-        map.fitBounds(routeBounds, { padding: [100, 100], animate: true });
+        map.fitBounds(routeBounds, { padding: [80, 80], animate: true });
       }
     } else if (
       map && 
@@ -56,7 +54,6 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
     ) {
       const currentCenter = map.getCenter();
       const dist = Math.sqrt(Math.pow(currentCenter.lat - center[0], 2) + Math.pow(currentCenter.lng - center[1], 2));
-      // Defensive check to prevent rapid map-update loops
       if (dist > 0.0001 || map.getZoom() !== zoom) {
         map.setView(center, zoom);
       }
@@ -159,7 +156,6 @@ export default function InteractiveMap({
             <Polyline 
               positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
               color="#a855f7"
-              dashArray="10, 15"
               weight={4}
               opacity={0.8}
             />
@@ -209,13 +205,13 @@ export default function InteractiveMap({
                   {userLocation ? (
                     <div className="pt-2 border-t mt-2 flex flex-col gap-2">
                        <div className="bg-primary/5 p-2 rounded-lg border border-primary/10">
-                         <p className="text-[9px] font-bold text-primary uppercase">Route Active</p>
-                         <p className="text-[10px] text-muted-foreground">Follow tactical path to NGO site.</p>
+                         <p className="text-[9px] font-bold text-primary uppercase">Tactical Route Plotted</p>
+                         <p className="text-[10px] text-muted-foreground">Follow path to mission site.</p>
                        </div>
                     </div>
                   ) : (
                     <div className="pt-2 border-t mt-2">
-                       <p className="text-[10px] text-amber-600 font-bold uppercase italic">Detect location to render path</p>
+                       <p className="text-[10px] text-amber-600 font-bold uppercase italic">Detect location to render route</p>
                     </div>
                   )}
                 </div>
