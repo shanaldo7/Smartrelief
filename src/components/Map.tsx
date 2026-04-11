@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
@@ -26,7 +27,16 @@ interface MapProps {
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    if (map) {
+    // Validate that the center is an array of two valid numbers before calling setView
+    if (
+      map && 
+      Array.isArray(center) && 
+      center.length === 2 && 
+      typeof center[0] === 'number' && 
+      typeof center[1] === 'number' &&
+      !isNaN(center[0]) && 
+      !isNaN(center[1])
+    ) {
       map.setView(center, zoom);
     }
   }, [center, zoom, map]);
