@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useCallback } from "react";
@@ -24,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const InteractiveMap = dynamic(() => import("@/components/Map"), { 
   ssr: false,
-  loading: () => <div className="h-[500px] w-full bg-muted animate-pulse rounded-[2.5rem] flex items-center justify-center text-muted-foreground border-4 border-dashed font-black uppercase tracking-[0.3em] text-xs">Initializing Satellite Link...</div>
+  loading: () => <div className="h-[500px] w-full bg-muted animate-pulse rounded-3xl flex items-center justify-center text-muted-foreground border-2 border-dashed font-bold uppercase tracking-widest text-xs italic">Initializing Strategic Feed...</div>
 });
 
 const EMPTY_ARRAY: any[] = [];
@@ -290,77 +289,85 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background flex flex-col">
         <Navbar />
         <div className="flex-grow flex items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/20">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
-      <main className="container mx-auto px-4 py-10 max-w-[1600px]">
-        <header className="mb-12 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 border-b-4 border-primary pb-10">
-          <div className="space-y-3">
-            <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase leading-none flex items-center gap-4">
-              <ShieldCheck className="h-12 w-12 text-primary" />
-              Command Center
-            </h1>
-            <div className="flex items-center gap-4">
-              <span className="w-3 h-3 rounded-full bg-accent animate-pulse" />
-              <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-                Operational Status: <span className="text-primary">Tactical Sync Active</span>
+      <main className="container mx-auto px-4 py-8 max-w-[1400px]">
+        <header className="mb-10 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 border-b pb-8">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-10 w-10 text-primary" />
+              <h1 className="text-4xl md:text-5xl font-black tracking-tight uppercase leading-tight">
+                Command Hub
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
+              </span>
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Network Status: <span className="text-primary">Operational Sync Active</span>
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="bg-muted p-1.5 rounded-[1.5rem] flex gap-2 border-2 shadow-inner">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="bg-muted p-1 rounded-xl flex gap-1 border shadow-inner">
               <Button 
                 variant={simulationRole === 'ngo' ? 'default' : 'ghost'} 
-                className={cn("rounded-xl font-black uppercase text-[11px] tracking-widest px-8 h-12 transition-all", simulationRole === 'ngo' && "shadow-xl")}
+                size="sm"
+                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'ngo' && "shadow-md")}
                 onClick={() => setSimulationRole('ngo')}
               >
-                <Briefcase className="h-4 w-4 mr-2" /> NGO Panel
+                NGO Control
               </Button>
               <Button 
                 variant={simulationRole === 'volunteer' ? 'default' : 'ghost'} 
-                className={cn("rounded-xl font-black uppercase text-[11px] tracking-widest px-8 h-12 transition-all", simulationRole === 'volunteer' && "shadow-xl")}
+                size="sm"
+                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'volunteer' && "shadow-md")}
                 onClick={() => setSimulationRole('volunteer')}
               >
-                <UserCircle className="h-4 w-4 mr-2" /> Volunteer Panel
+                Responder
               </Button>
             </div>
             
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <Button 
-                className="h-14 px-8 rounded-2xl font-black uppercase tracking-widest shadow-2xl bg-destructive hover:bg-destructive/90 text-white gap-3 animate-bounce" 
+                variant="destructive"
+                className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest shadow-lg gap-2 text-[10px]" 
                 onClick={handleFocusEmergency}
               >
-                <AlertTriangle className="h-6 w-6" />
-                🚨 Focus Emergency
+                <AlertTriangle className="h-4 w-4" />
+                Emergency Focus
               </Button>
               <Button 
                 variant="outline" 
-                className="h-14 px-8 rounded-2xl font-black uppercase tracking-widest border-4 gap-3" 
+                className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest border-2 gap-2 text-[10px]" 
                 onClick={handleLocateMe}
                 disabled={isLocating}
               >
-                <Navigation className={cn("h-6 w-6", isLocating && "animate-pulse")} />
-                {isLocating ? "Syncing..." : "Detect Position"}
+                <Navigation className={cn("h-4 w-4", isLocating && "animate-pulse")} />
+                {isLocating ? "Syncing..." : "Detect Me"}
               </Button>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <div className="lg:col-span-9 space-y-10">
-            {/* Tactical Filter System */}
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 bg-card p-6 rounded-[2.5rem] border-4 shadow-xl">
-               <div className="space-y-2">
-                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-2 tracking-widest">Relief Sector</p>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-9 space-y-8">
+            {/* Professional Filter Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-card p-4 rounded-2xl border shadow-sm">
+               <div className="space-y-1">
+                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Relief Sector</Label>
                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                   <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue placeholder="Category" /></SelectTrigger>
+                   <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Category" /></SelectTrigger>
                    <SelectContent>
                      <SelectItem value="all">All Sectors</SelectItem>
                      <SelectItem value="Food">Food & Nutrition</SelectItem>
@@ -370,10 +377,10 @@ export default function Dashboard() {
                    </SelectContent>
                  </Select>
                </div>
-               <div className="space-y-2">
-                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-2 tracking-widest">Urgency Rank</p>
+               <div className="space-y-1">
+                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Urgency Level</Label>
                  <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
-                   <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
+                   <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
                    <SelectContent>
                      <SelectItem value="all">All Levels</SelectItem>
                      <SelectItem value="high">Critical Only</SelectItem>
@@ -383,13 +390,13 @@ export default function Dashboard() {
                  </Select>
                </div>
                <div className="flex items-end">
-                 <Button variant="ghost" className="w-full rounded-xl font-black uppercase text-[10px] tracking-[0.2em] h-12 border-4 border-dashed" onClick={() => { setCategoryFilter('all'); setUrgencyFilter('all'); setLocationFilter('all'); }}>
-                   <FilterX className="h-5 w-5 mr-3" /> Reset Operational Filter
+                 <Button variant="ghost" size="sm" className="w-full rounded-xl font-bold uppercase text-[10px] tracking-widest h-10 border-2 border-dashed" onClick={() => { setCategoryFilter('all'); setUrgencyFilter('all'); setLocationFilter('all'); }}>
+                   <FilterX className="h-4 w-4 mr-2" /> Reset Filters
                  </Button>
                </div>
             </div>
 
-            <Card className="border-4 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] overflow-hidden h-[600px] relative bg-card rounded-[3rem]">
+            <Card className="border-2 shadow-lg overflow-hidden h-[500px] relative bg-card rounded-3xl">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
                 volunteers={rawVolunteers || EMPTY_ARRAY} 
@@ -399,92 +406,85 @@ export default function Dashboard() {
                 selectedTaskId={selectedTaskId}
                 onTaskSelect={handleTaskSelect}
               />
-              <div className="absolute bottom-10 left-10 z-[1000] flex gap-4">
-                <div className="glass p-6 rounded-[2rem] flex flex-col gap-4 min-w-[220px]">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-2">Tactical Indicators</h4>
-                  <div className="flex items-center gap-3 text-xs font-black uppercase">
-                    <div className="w-4 h-4 rounded-full bg-destructive border-2 border-white" /> Emergency Crisis
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-black uppercase">
-                    <div className="w-4 h-4 rounded-full bg-primary border-2 border-white" /> Active Responder
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-black uppercase">
-                    <div className="w-4 h-4 rounded-full bg-accent border-2 border-white" /> Verified Site
-                  </div>
-                </div>
+              <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md" onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}><Zap className="h-4 w-4" /></Button>
+                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md" onClick={() => setMapZoom(prev => Math.max(prev - 1, 3))}><Route className="h-4 w-4" /></Button>
               </div>
             </Card>
 
             {simulationRole === 'ngo' ? (
-              <Tabs defaultValue="matches" className="space-y-10">
-                <TabsList className="flex w-fit bg-muted p-1.5 rounded-2xl h-14 border-2 shadow-inner">
-                  <TabsTrigger value="matches" className="rounded-xl font-black uppercase text-[11px] tracking-widest px-8 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-xl">Smart Deployment</TabsTrigger>
-                  <TabsTrigger value="missions" className="rounded-xl font-black uppercase text-[11px] tracking-widest px-8 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-xl">Active Grid</TabsTrigger>
-                  <TabsTrigger value="personnel" className="rounded-xl font-black uppercase text-[11px] tracking-widest px-8 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-xl">Responders</TabsTrigger>
+              <Tabs defaultValue="matches" className="space-y-8">
+                <TabsList className="bg-muted p-1 rounded-xl h-12 border">
+                  <TabsTrigger value="matches" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Smart Deployment</TabsTrigger>
+                  <TabsTrigger value="missions" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Active Grid</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="matches" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                  {matches.slice(0, 9).map((match) => (
-                    <Card key={`${match.taskId}-${match.volunteerId}`} className="border-4 shadow-lg hover:shadow-2xl transition-all group rounded-[2.5rem] overflow-hidden flex flex-col bg-card">
-                      <div className="h-3 bg-primary/20 group-hover:bg-primary transition-colors" />
-                      <CardHeader className="pb-4">
+                <TabsContent value="matches" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {matches.length > 0 ? matches.slice(0, 6).map((match) => (
+                    <Card key={`${match.taskId}-${match.volunteerId}`} className="border-2 shadow-sm hover:shadow-md transition-all rounded-2xl overflow-hidden flex flex-col">
+                      <div className="h-1.5 bg-primary/20" />
+                      <CardHeader className="p-5 pb-2">
                          <div className="flex justify-between items-start">
-                           <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-2 py-1 px-4">{match.distance}KM Away</Badge>
-                           <Target className="h-6 w-6 text-primary" />
+                           <Badge variant="outline" className="text-[9px] font-bold uppercase border-2">{match.distance}KM Range</Badge>
+                           <Target className="h-5 w-5 text-primary" />
                          </div>
-                         <CardTitle className="text-2xl font-black leading-tight mt-4">Tactical Match</CardTitle>
+                         <CardTitle className="text-xl font-bold mt-3 leading-tight">Match Detected</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-4 flex-grow">
-                        <div className="p-5 bg-muted rounded-[1.5rem] border-l-8 border-destructive">
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-1">Target Mission</p>
-                          <p className="font-black text-sm text-foreground uppercase">{match.taskTitle}</p>
+                      <CardContent className="p-5 pt-2 space-y-3 flex-grow">
+                        <div className="p-3 bg-muted rounded-xl border-l-4 border-destructive">
+                          <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Incident</p>
+                          <p className="font-bold text-xs uppercase truncate">{match.taskTitle}</p>
                         </div>
-                        <div className="p-5 bg-primary/5 rounded-[1.5rem] border-l-8 border-primary">
-                          <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] mb-1">Assigned Personnel</p>
-                          <p className="font-black text-sm text-foreground uppercase">{match.volunteerName}</p>
+                        <div className="p-3 bg-primary/5 rounded-xl border-l-4 border-primary">
+                          <p className="text-[9px] font-bold uppercase text-primary mb-1">Personnel</p>
+                          <p className="font-bold text-xs uppercase truncate">{match.volunteerName}</p>
                         </div>
                       </CardContent>
-                      <CardFooter className="pt-6 border-t bg-muted/20">
-                         <Button className="w-full h-14 font-black uppercase text-[12px] tracking-widest rounded-2xl gap-3 shadow-xl" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
-                           <UserCheck className="h-5 w-5" /> Deploy Force
+                      <CardFooter className="p-5 pt-0">
+                         <Button className="w-full h-10 font-bold uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-md" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
+                           <UserCheck className="h-4 w-4" /> Deploy
                          </Button>
                       </CardFooter>
                     </Card>
-                  ))}
+                  )) : (
+                    <div className="col-span-full py-20 text-center border-4 border-dashed rounded-3xl opacity-40">
+                      <p className="font-bold uppercase tracking-widest text-sm italic">No Optimal Matches Found in Sector</p>
+                    </div>
+                  )}
                 </TabsContent>
 
-                <TabsContent value="missions" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                <TabsContent value="missions" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {filteredTasks.map(task => (
-                    <Card key={task.id} className={cn("border-4 shadow-md bg-card rounded-[2.5rem] overflow-hidden group", task.status === 'completed' && "opacity-40 grayscale")}>
-                      <CardHeader className="pb-6">
-                        <div className="flex justify-between items-center mb-4">
-                          <Badge className={cn("text-[10px] uppercase font-black tracking-widest px-4 py-2 rounded-xl", 
+                    <Card key={task.id} className={cn("border-2 shadow-sm bg-card rounded-2xl overflow-hidden group", task.status === 'completed' && "opacity-40 grayscale")}>
+                      <CardHeader className="p-5">
+                        <div className="flex justify-between items-center mb-2">
+                          <Badge className={cn("text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded-lg", 
                             task.urgency === 'high' ? "bg-destructive text-white" : "bg-primary text-white")}>
                             {task.urgency}
                           </Badge>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                             <MapPin className="h-4 w-4 text-primary" /> {task.location}
+                          <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
+                             <MapPin className="h-3 w-3 text-primary" /> {task.location}
                           </span>
                         </div>
-                        <CardTitle className="text-2xl font-black leading-tight group-hover:text-primary transition-colors">{task.title}</CardTitle>
+                        <CardTitle className="text-lg font-bold leading-tight truncate">{task.title}</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-4 pt-0">
-                        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed font-bold italic">"{task.description}"</p>
+                      <CardContent className="p-5 pt-0 space-y-3">
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium italic">"{task.description}"</p>
                         {task.assignedTo && (
-                          <div className="pt-4 border-t flex items-center gap-3">
-                            <ShieldCheck className="h-5 w-5 text-accent" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-accent">Active: {task.assignedTo}</span>
+                          <div className="pt-2 border-t flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-accent" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-accent">Responder: {task.assignedTo}</span>
                           </div>
                         )}
                       </CardContent>
-                      <CardFooter className="pt-6 border-t flex gap-4 bg-muted/10">
+                      <CardFooter className="p-5 pt-0 flex gap-2">
                          {task.status !== 'completed' && (
-                           <Button variant="ghost" className="flex-1 h-12 text-[11px] font-black uppercase tracking-widest rounded-xl" onClick={() => handleMarkAsCompleted(task.id)}>
-                             <CheckCircle className="h-4 w-4 mr-2" /> Complete
+                           <Button variant="ghost" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border" onClick={() => handleMarkAsCompleted(task.id)}>
+                             Complete
                            </Button>
                          )}
-                         <Button variant="outline" className="flex-1 h-12 text-[11px] font-black uppercase tracking-widest rounded-xl border-4" onClick={() => handleTaskSelect(task.id)}>
-                           <MapIcon className="h-4 w-4 mr-2" /> Track Site
+                         <Button variant="outline" size="sm" className="flex-1 h-9 text-[9px] font-bold uppercase tracking-widest rounded-lg border-2" onClick={() => handleTaskSelect(task.id)}>
+                           Track Site
                          </Button>
                       </CardFooter>
                     </Card>
@@ -492,45 +492,45 @@ export default function Dashboard() {
                 </TabsContent>
               </Tabs>
             ) : (
-              <Tabs defaultValue="nearby" className="space-y-10">
-                 <TabsList className="flex w-fit bg-muted p-1.5 rounded-2xl h-14 border-2 shadow-inner">
-                   <TabsTrigger value="nearby" className="rounded-xl font-black uppercase text-[11px] tracking-widest px-8 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-xl">Nearby Threats</TabsTrigger>
-                   <TabsTrigger value="assignments" className="rounded-xl font-black uppercase text-[11px] tracking-widest px-8 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-xl">My Missions</TabsTrigger>
+              <Tabs defaultValue="nearby" className="space-y-8">
+                 <TabsList className="bg-muted p-1 rounded-xl h-12 border">
+                   <TabsTrigger value="nearby" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Nearby Missions</TabsTrigger>
+                   <TabsTrigger value="assignments" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 data-[state=active]:bg-primary data-[state=active]:text-white">My Deployments</TabsTrigger>
                  </TabsList>
 
                  <TabsContent value="nearby">
                    {!userLocation ? (
-                     <Card className="border-4 border-dashed py-32 text-center bg-card rounded-[3rem] shadow-2xl">
-                       <Navigation className="h-20 w-20 text-muted-foreground/20 mx-auto mb-8 animate-pulse" />
-                       <h3 className="text-4xl font-black text-foreground uppercase tracking-tighter mb-4">Location Not Synced</h3>
-                       <p className="text-xl text-muted-foreground font-bold italic max-w-lg mx-auto mb-10">Verify your current coordinates to see real-time humanitarian needs in your sector.</p>
-                       <Button onClick={handleLocateMe} className="h-16 px-12 rounded-[1.5rem] font-black uppercase text-lg tracking-widest shadow-2xl">Sync Tactical Position</Button>
-                     </Card>
+                     <div className="py-24 text-center border-4 border-dashed rounded-3xl bg-card shadow-inner">
+                       <Navigation className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6 animate-pulse" />
+                       <h3 className="text-2xl font-bold text-foreground uppercase tracking-tight mb-2">Location Required</h3>
+                       <p className="text-sm text-muted-foreground font-medium italic max-w-sm mx-auto mb-8">Sync your tactical position to identify real-time humanitarian needs in your immediate area.</p>
+                       <Button onClick={handleLocateMe} className="h-12 px-10 rounded-xl font-bold uppercase text-xs tracking-widest shadow-xl">Sync Tactical GPS</Button>
+                     </div>
                    ) : (
-                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                        {nearbyOpportunities.map(task => (
-                         <Card key={task.id} className="border-4 shadow-xl bg-card rounded-[2.5rem] overflow-hidden flex flex-col hover:scale-[1.02] transition-transform">
-                            <div className="p-4 bg-primary/10 border-b-4 flex justify-between items-center px-8">
-                               <span className="text-[11px] font-black uppercase text-primary tracking-widest flex items-center gap-3">
-                                 <LocateFixed className="h-5 w-5" /> {task.distance.toFixed(1)}KM FROM YOU
+                         <Card key={task.id} className="border-2 shadow-sm bg-card rounded-2xl overflow-hidden flex flex-col hover:border-primary transition-colors">
+                            <div className="p-3 bg-primary/5 border-b flex justify-between items-center px-5">
+                               <span className="text-[10px] font-bold uppercase text-primary tracking-widest flex items-center gap-2">
+                                 <LocateFixed className="h-4 w-4" /> {task.distance.toFixed(1)}KM DISTANCE
                                </span>
-                               <Badge className="bg-accent text-white font-black uppercase text-[9px] py-1 px-3">Active Crisis</Badge>
+                               <Badge className="bg-accent text-white font-bold uppercase text-[8px] py-0.5 px-2">Live Crisis</Badge>
                             </div>
-                            <CardHeader className="pb-4">
-                              <CardTitle className="text-2xl font-black text-foreground uppercase">{task.title}</CardTitle>
-                              <CardDescription className="font-black text-muted-foreground tracking-widest">{task.category} • {task.location}</CardDescription>
+                            <CardHeader className="p-5 pb-2">
+                              <CardTitle className="text-lg font-bold uppercase truncate">{task.title}</CardTitle>
+                              <CardDescription className="font-bold text-[10px] text-muted-foreground tracking-widest uppercase">{task.category} • {task.location}</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6 flex-grow">
-                               <p className="text-sm text-muted-foreground leading-relaxed italic font-bold">"{task.description}"</p>
-                               <div className="flex flex-wrap gap-2">
+                            <CardContent className="p-5 pt-2 space-y-4 flex-grow">
+                               <p className="text-xs text-muted-foreground leading-relaxed italic font-medium line-clamp-3">"{task.description}"</p>
+                               <div className="flex flex-wrap gap-1">
                                  {task.skillsRequired.map((s, i) => (
-                                   <Badge key={i} variant="secondary" className="text-[10px] font-black uppercase py-1 px-3 border-2">{s}</Badge>
+                                   <Badge key={i} variant="secondary" className="text-[8px] font-bold uppercase py-0.5 px-2 border">{s}</Badge>
                                  ))}
                                </div>
                             </CardContent>
-                            <CardFooter className="pt-6 border-t p-6 bg-muted/10">
-                               <Button className="w-full h-14 gap-4 font-black uppercase text-[12px] tracking-widest rounded-2xl shadow-xl" onClick={() => handleTaskSelect(task.id)}>
-                                 <Route className="h-6 w-6" /> Calculate Route
+                            <CardFooter className="p-5 pt-0">
+                               <Button className="w-full h-11 gap-2 font-bold uppercase text-[10px] tracking-widest rounded-xl shadow-md" onClick={() => handleTaskSelect(task.id)}>
+                                 <Route className="h-4 w-4" /> Plot Route
                                </Button>
                             </CardFooter>
                          </Card>
@@ -542,51 +542,51 @@ export default function Dashboard() {
             )}
           </div>
 
-          <aside className="lg:col-span-3 space-y-10">
-            {/* Live Activity Feed */}
-            <Card className="shadow-2xl border-4 bg-card rounded-[2.5rem] overflow-hidden">
-               <CardHeader className="bg-primary/5 border-b-4 p-8">
-                 <CardTitle className="text-lg font-black flex items-center gap-4 text-primary uppercase tracking-[0.2em]">
-                   <Activity className="h-6 w-6 text-accent" />
-                   Operational Feed
+          <aside className="lg:col-span-3 space-y-8">
+            {/* Live Operational Feed */}
+            <Card className="shadow-lg border-2 bg-card rounded-3xl overflow-hidden">
+               <CardHeader className="bg-muted/30 border-b p-6">
+                 <CardTitle className="text-sm font-bold flex items-center gap-3 text-primary uppercase tracking-widest">
+                   <Activity className="h-5 w-5 text-accent" />
+                   Tactical Feed
                  </CardTitle>
                </CardHeader>
-               <CardContent className="p-8 space-y-6">
+               <CardContent className="p-6 space-y-4">
                  {activitiesLoading ? (
-                   <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                   <div className="flex justify-center p-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
                  ) : activities && activities.length > 0 ? (
                    activities.map(act => (
-                     <div key={act.id} className="p-5 bg-muted rounded-2xl border-l-8 border-primary relative overflow-hidden group hover:bg-muted/80 transition-all">
-                        <div className={cn("absolute top-0 right-0 w-2 h-full", 
+                     <div key={act.id} className="p-4 bg-muted/50 rounded-xl border-l-4 border-primary relative overflow-hidden group hover:bg-muted transition-colors">
+                        <div className={cn("absolute top-0 right-0 w-1.5 h-full opacity-50", 
                            act.type === 'new_task' ? "bg-primary" : 
                            act.type === 'assigned' ? "bg-accent" : "bg-emerald-500")} />
-                        <p className="font-black text-foreground text-xs leading-tight uppercase mb-2">{act.message}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">
-                          {act.timestamp?.toMillis ? new Date(act.timestamp.toMillis()).toLocaleTimeString() : 'SYNCHRONIZING...'}
+                        <p className="font-bold text-foreground text-[11px] leading-tight uppercase mb-1">{act.message}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
+                          {act.timestamp?.toMillis ? new Date(act.timestamp.toMillis()).toLocaleTimeString() : 'PENDING SYNC'}
                         </p>
                      </div>
                    ))
                  ) : (
-                   <div className="text-center py-10 text-xs font-black uppercase text-muted-foreground opacity-50 tracking-[0.3em]">Grid Silence.</div>
+                   <div className="text-center py-6 text-[10px] font-bold uppercase text-muted-foreground opacity-30 tracking-widest italic">Monitoring Grid...</div>
                  )}
                </CardContent>
             </Card>
 
-            <Card className="shadow-2xl border-4 bg-primary/[0.02] rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="p-8 bg-muted/50 border-b-4">
-                <CardTitle className="text-xs font-black flex items-center gap-4 uppercase tracking-[0.3em] text-primary">
-                  <BarChart3 className="h-6 w-6" /> Sector Impact
+            <Card className="shadow-lg border-2 bg-card rounded-3xl overflow-hidden">
+              <CardHeader className="p-6 bg-muted/30 border-b">
+                <CardTitle className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-primary">
+                  <BarChart3 className="h-5 w-5" /> Regional Analytics
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-8 space-y-10">
-                <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -10 }}>
+              <CardContent className="p-6">
+                <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -15 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[10px] font-black uppercase text-muted-foreground" width={80} />
+                    <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[9px] font-bold uppercase text-muted-foreground" width={70} />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Bar dataKey="tasks" radius={[0, 10, 10, 0]} fill="hsl(var(--primary))">
+                    <Bar dataKey="tasks" radius={[0, 8, 8, 0]} fill="hsl(var(--primary))">
                       {areaImpact.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"} />
+                        <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.5)"} />
                       ))}
                     </Bar>
                   </BarChart>
