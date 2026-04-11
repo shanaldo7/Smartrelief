@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShieldCheck, MapPin, Navigation, Mail, User } from "lucide-react";
+import { ShieldCheck, Navigation, Mail, User } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -169,10 +169,9 @@ export default function NewVolunteer() {
                       <Checkbox 
                         id={`skill-${skill}`} 
                         checked={selectedSkills.includes(skill)} 
-                        onCheckedChange={() => handleSkillToggle(skill)} 
-                        className="rounded-full h-5 w-5 border-2"
+                        className="rounded-full h-5 w-5 border-2 pointer-events-none"
                       />
-                      <Label htmlFor={`skill-${skill}`} className="flex-grow cursor-pointer font-bold text-xs uppercase tracking-tight">{skill}</Label>
+                      <Label className="flex-grow cursor-pointer font-bold text-xs uppercase tracking-tight pointer-events-none">{skill}</Label>
                     </div>
                   ))}
                 </div>
