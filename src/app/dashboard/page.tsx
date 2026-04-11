@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -82,6 +82,8 @@ export default function Dashboard() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
   const [mapZoom, setMapZoom] = useState(5);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
@@ -141,7 +143,6 @@ export default function Dashboard() {
       return;
     }
 
-    // Find the first task in this region to get coordinates
     const regionalTask = rawTasks?.find(t => t.location === regionName);
     if (regionalTask && regionalTask.latitude && regionalTask.longitude) {
       setMapCenter([regionalTask.latitude, regionalTask.longitude]);
@@ -151,6 +152,30 @@ export default function Dashboard() {
         description: `Map centered on ${regionName}.` 
       });
     }
+  };
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast({ variant: "destructive", title: "Unsupported", description: "Geolocation is not supported by your browser." });
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserLocation([latitude, longitude]);
+        setMapCenter([latitude, longitude]);
+        setMapZoom(13);
+        setIsLocating(false);
+        toast({ title: "Position Detected", description: "Centering on your location to find nearby tasks." });
+      },
+      (error) => {
+        setIsLocating(false);
+        toast({ variant: "destructive", title: "Detection Failed", description: "Could not retrieve your location. Please check permissions." });
+      },
+      { enableHighAccuracy: true }
+    );
   };
 
   const matches = useMemo(() => {
@@ -209,9 +234,7 @@ export default function Dashboard() {
         title: "NGO Data Synchronized",
         description: `Successfully imported sample humanitarian tasks.`,
       });
-    } catch (error) {
-      // Handled globally
-    } finally {
+    } catch (error) { } finally {
       setIsImporting(false);
     }
   };
@@ -235,10 +258,7 @@ export default function Dashboard() {
       assignedTo: volunteerName,
       updatedAt: serverTimestamp(),
     });
-    toast({
-      title: "Task Assigned",
-      description: `Task has been marked as assigned and removed from active matching.`,
-    });
+    toast({ title: "Task Assigned", description: `Task has been marked as assigned.` });
   };
 
   const handleMarkAsCompleted = (taskId: string) => {
@@ -248,10 +268,7 @@ export default function Dashboard() {
       status: "completed",
       updatedAt: serverTimestamp(),
     });
-    toast({
-      title: "Task Completed",
-      description: `The task has been successfully fulfilled.`,
-    });
+    toast({ title: "Task Completed", description: `The task has been successfully fulfilled.` });
   };
 
   if (isUserLoading || tasksLoading || volunteersLoading) {
@@ -275,26 +292,15 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Strategic real-time mapping and resource mobilization.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 mr-2">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-10 w-10 shadow-sm"
-                onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}
-                title="Zoom In"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-10 w-10 shadow-sm"
-                onClick={() => setMapZoom(prev => Math.max(prev - 1, 2))}
-                title="Zoom Out"
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              className="gap-2 border-primary text-primary hover:bg-primary/5" 
+              onClick={handleLocateMe}
+              disabled={isLocating}
+            >
+              <Navigation className={cn("h-4 w-4", isLocating && "animate-pulse")} />
+              {isLocating ? "Locating..." : "Detect My Location"}
+            </Button>
             <Button variant="outline" className="gap-2" onClick={handleFocusCritical}>
               <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical
             </Button>
@@ -330,6 +336,7 @@ export default function Dashboard() {
                 volunteers={rawVolunteers || []} 
                 center={mapCenter} 
                 zoom={mapZoom}
+                userLocation={userLocation}
               />
               <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border text-[10px] font-bold uppercase space-y-2">
@@ -343,7 +350,7 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white" /> Low Urgency
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 border border-white" /> Rescuer
+                    <div className="w-3 h-3 rounded-full bg-purple-500 border border-white" /> You
                   </div>
                 </div>
               </div>
@@ -362,7 +369,7 @@ export default function Dashboard() {
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {matches.length > 0 ? (
                      matches.filter(m => locationFilter === 'all' || m.reasons.some(r => r === "Geographic Proximity")).slice(0, 9).map((match, i) => (
-                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card group flex flex-col">
+                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-none shadow-md hover:shadow-xl transition-all duration-300 bg-card group flex flex-col relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-4">
                            <div className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
                              <Zap className="h-3 w-3" /> {match.score} Score
@@ -524,7 +531,7 @@ export default function Dashboard() {
                </CardHeader>
                <CardContent className="space-y-4">
                   <div className="p-3 bg-white rounded-lg border-l-4 border-emerald-500 shadow-sm text-[11px] leading-relaxed">
-                    Once a task is fulfilled, it is automatically marked as completed and removed from active matching, ensuring efficient resource utilization.
+                    Centering on your location helps identify local humanitarian needs where you can have the most immediate impact.
                   </div>
                </CardContent>
             </Card>

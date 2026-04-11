@@ -14,9 +14,10 @@ interface MapProps {
   volunteers: any[];
   center?: [number, number];
   zoom?: number;
+  userLocation?: [number, number] | null;
 }
 
-// Inline SVG icon for MapPin to avoid ReferenceErrors during bundle resolution
+// Inline SVG icons to avoid ReferenceErrors in dynamic bundles
 const MapPinIcon = () => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -32,6 +33,23 @@ const MapPinIcon = () => (
   >
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
     <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const UserIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="14" 
+    height="14" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="3" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+  >
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" />
   </svg>
 );
 
@@ -53,23 +71,24 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
   return null;
 }
 
-export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 78.9629], zoom = 5 }: MapProps) {
+export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 78.9629], zoom = 5, userLocation }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [icons, setIcons] = useState<Record<string, any>>({});
   const [L, setL] = useState<any>(null);
 
   useEffect(() => {
-    // Dynamic import inside useEffect to ensure it only runs on the client
     const initLeaflet = async () => {
       const Leaflet = await import('leaflet');
       setL(Leaflet.default);
 
-      const createIcon = (color: string) => {
+      const createIcon = (color: string, isUser = false) => {
         return new Leaflet.DivIcon({
           className: "custom-div-icon",
-          html: `<div style="background-color: ${color}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 6px rgba(0,0,0,0.4);"></div>`,
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
+          html: `<div style="background-color: ${color}; width: ${isUser ? '18px' : '14px'}; height: ${isUser ? '18px' : '14px'}; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.5); position: relative;">
+            ${isUser ? '<div style="position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border: 2px solid ' + color + '; border-radius: 50%; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
+          </div>`,
+          iconSize: [isUser ? 18 : 14, isUser ? 18 : 14],
+          iconAnchor: [isUser ? 9 : 7, isUser ? 9 : 7],
         });
       };
 
@@ -78,6 +97,7 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
         medium: createIcon(urgencyColors.medium),
         low: createIcon(urgencyColors.low),
         volunteer: createIcon("#3b82f6"),
+        user: createIcon("#8b5cf6", true), // Purple for user
       });
       setIsMounted(true);
     };
@@ -90,7 +110,7 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
       <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground min-h-[450px]">
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin border-4 border-primary border-t-transparent rounded-full" />
-          <span className="text-xs font-bold uppercase tracking-widest">Initializing Radar...</span>
+          <span className="text-xs font-bold uppercase tracking-widest">Calibrating Satellites...</span>
         </div>
       </div>
     );
@@ -112,6 +132,18 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
         />
         <ChangeView center={center} zoom={zoom} />
         
+        {/* User Location Marker */}
+        {userLocation && (
+          <Marker position={userLocation} icon={icons.user}>
+            <Popup>
+              <div className="p-1 text-center">
+                <p className="font-bold text-sm text-primary">Your Location</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Active Monitoring Area</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {tasks.map((task) => (
           task.latitude && task.longitude && (
             <Marker 
@@ -134,10 +166,6 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
                         {task.urgency}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Status</span>
-                      <span className="text-[10px] font-bold text-primary uppercase">{task.status}</span>
-                    </div>
                   </div>
                 </div>
               </Popup>
@@ -156,20 +184,20 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
                 <div className="space-y-1 min-w-[120px] p-1">
                   <p className="font-bold text-sm leading-tight text-foreground">{vol.name}</p>
                   <p className="text-xs text-muted-foreground">{vol.location}</p>
-                  <div className="mt-2">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold mb-1">Expertise</p>
-                    <div className="flex flex-wrap gap-1">
-                      {vol.skills?.slice(0, 3).map((s: string) => (
-                        <span key={s} className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-medium">{s}</span>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </Popup>
             </Marker>
           )
         ))}
       </MapContainer>
+      <style jsx global>{`
+        @keyframes ping {
+          75%, 100% {
+            transform: scale(2);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
