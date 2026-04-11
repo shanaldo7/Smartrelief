@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet"
 
 const urgencyColors = {
   high: "#ef4444",   // Red
@@ -15,9 +15,10 @@ interface MapProps {
   center?: [number, number];
   zoom?: number;
   userLocation?: [number, number] | null;
+  onTaskSelect?: (taskId: string | null) => void;
+  selectedTaskId?: string | null;
 }
 
-// Inline SVG icons to avoid ReferenceErrors in dynamic bundles
 const MapPinIcon = () => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
@@ -33,23 +34,6 @@ const MapPinIcon = () => (
   >
     <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
     <circle cx="12" cy="10" r="3" />
-  </svg>
-);
-
-const UserIcon = () => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="14" 
-    height="14" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="3" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-  >
-    <circle cx="12" cy="12" r="10" />
-    <circle cx="12" cy="12" r="3" fill="currentColor" />
   </svg>
 );
 
@@ -71,7 +55,15 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
   return null;
 }
 
-export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 78.9629], zoom = 5, userLocation }: MapProps) {
+export default function InteractiveMap({ 
+  tasks, 
+  volunteers, 
+  center = [20.5937, 78.9629], 
+  zoom = 5, 
+  userLocation,
+  onTaskSelect,
+  selectedTaskId 
+}: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [icons, setIcons] = useState<Record<string, any>>({});
   const [L, setL] = useState<any>(null);
@@ -105,6 +97,9 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
     initLeaflet();
   }, []);
 
+  // Find the selected task to draw the route
+  const selectedTask = tasks.find(t => t.id === selectedTaskId);
+
   if (!isMounted || !L || Object.keys(icons).length === 0) {
     return (
       <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground min-h-[450px]">
@@ -132,6 +127,17 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
         />
         <ChangeView center={center} zoom={zoom} />
         
+        {/* Route Line */}
+        {userLocation && selectedTask && selectedTask.latitude && selectedTask.longitude && (
+          <Polyline 
+            positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
+            color="#8b5cf6"
+            dashArray="10, 10"
+            weight={3}
+            opacity={0.8}
+          />
+        )}
+
         {/* User Location Marker */}
         {userLocation && (
           <Marker position={userLocation} icon={icons.user}>
@@ -150,6 +156,11 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
               key={task.id} 
               position={[task.latitude, task.longitude]} 
               icon={icons[task.urgency as keyof typeof icons] || icons.low}
+              eventHandlers={{
+                click: () => {
+                  if (onTaskSelect) onTaskSelect(task.id);
+                },
+              }}
             >
               <Popup>
                 <div className="space-y-1 min-w-[150px] p-1">
@@ -166,6 +177,12 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
                         {task.urgency}
                       </span>
                     </div>
+                    {userLocation && (
+                      <div className="pt-2 border-t mt-1">
+                         <p className="text-[9px] font-bold text-primary uppercase">Route Active</p>
+                         <p className="text-[10px] text-muted-foreground">Tap to focus on response path.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Popup>

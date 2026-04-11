@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -84,6 +84,7 @@ export default function Dashboard() {
   const [mapZoom, setMapZoom] = useState(5);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
@@ -135,8 +136,20 @@ export default function Dashboard() {
       .sort((a, b) => b.tasks - a.tasks);
   }, [rawTasks]);
 
+  const handleTaskSelect = (taskId: string | null) => {
+    setSelectedTaskId(taskId);
+    if (taskId) {
+      const task = rawTasks?.find(t => t.id === taskId);
+      if (task && task.latitude) {
+        setMapCenter([task.latitude, task.longitude]);
+        setMapZoom(14);
+      }
+    }
+  };
+
   const handleRegionClick = (regionName: string) => {
     setLocationFilter(regionName);
+    setSelectedTaskId(null); // Clear selected task when changing region
     if (regionName === 'all') {
       setMapCenter([20.5937, 78.9629]);
       setMapZoom(5);
@@ -244,6 +257,7 @@ export default function Dashboard() {
     if (highUrgency && highUrgency.latitude) {
       setMapCenter([highUrgency.latitude, highUrgency.longitude]);
       setMapZoom(12);
+      setSelectedTaskId(highUrgency.id);
       toast({ title: "Map Focused", description: "Zoomed into high-urgency incident zone." });
     } else {
       toast({ variant: "destructive", title: "No Data", description: "No active high-urgency tasks found to focus on." });
@@ -268,6 +282,7 @@ export default function Dashboard() {
       status: "completed",
       updatedAt: serverTimestamp(),
     });
+    if (selectedTaskId === taskId) setSelectedTaskId(null);
     toast({ title: "Task Completed", description: `The task has been successfully fulfilled.` });
   };
 
@@ -337,8 +352,28 @@ export default function Dashboard() {
                 center={mapCenter} 
                 zoom={mapZoom}
                 userLocation={userLocation}
+                selectedTaskId={selectedTaskId}
+                onTaskSelect={handleTaskSelect}
               />
               <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                {selectedTaskId && userLocation && (
+                   <div className="bg-primary text-primary-foreground px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-4">
+                     <div className="flex flex-col">
+                       <span className="text-[10px] uppercase font-bold opacity-80">Tactical Route</span>
+                       <span className="text-xs font-bold truncate max-w-[150px]">
+                         {activeTasksForMap.find(t => t.id === selectedTaskId)?.title}
+                       </span>
+                     </div>
+                     <Button 
+                       size="icon" 
+                       variant="ghost" 
+                       className="h-6 w-6 hover:bg-white/20" 
+                       onClick={() => setSelectedTaskId(null)}
+                     >
+                       <X className="h-3 w-3" />
+                     </Button>
+                   </div>
+                )}
                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border text-[10px] font-bold uppercase space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-red-500 border border-white" /> High Urgency
@@ -407,7 +442,14 @@ export default function Dashboard() {
                <TabsContent value="tasks" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {filteredTasks.map(task => (
-                     <Card key={task.id} className={cn("border-none shadow-sm bg-card relative", task.status === 'completed' && "opacity-60")}>
+                     <Card 
+                       key={task.id} 
+                       className={cn(
+                         "border-none shadow-sm bg-card relative transition-all", 
+                         task.status === 'completed' && "opacity-60",
+                         selectedTaskId === task.id && "ring-2 ring-primary"
+                       )}
+                     >
                        <CardHeader className="pb-2">
                          <div className="flex justify-between items-start mb-2">
                            <Badge className={cn("text-[10px] uppercase font-bold", 
@@ -430,8 +472,13 @@ export default function Dashboard() {
                              <CheckCircle className="h-3 w-3 mr-2" /> Complete
                            </Button>
                          )}
-                         <Button variant="outline" size="sm" className="text-xs" onClick={() => { setMapCenter([task.latitude, task.longitude]); setMapZoom(15); }}>
-                           <MapIcon className="h-3 w-3" /> View Map
+                         <Button 
+                           variant={selectedTaskId === task.id ? "default" : "outline"} 
+                           size="sm" 
+                           className="text-xs" 
+                           onClick={() => handleTaskSelect(task.id)}
+                         >
+                           <MapIcon className="h-3 w-3" /> View Route
                          </Button>
                        </CardFooter>
                      </Card>
@@ -533,6 +580,11 @@ export default function Dashboard() {
                   <div className="p-3 bg-white rounded-lg border-l-4 border-emerald-500 shadow-sm text-[11px] leading-relaxed">
                     Centering on your location helps identify local humanitarian needs where you can have the most immediate impact.
                   </div>
+                  {selectedTaskId && userLocation && (
+                    <div className="p-3 bg-primary/10 rounded-lg border-l-4 border-primary shadow-sm text-[11px] leading-relaxed animate-pulse">
+                      A tactical route has been calculated to the target destination. Follow the dashed line on your tactical overlay.
+                    </div>
+                  )}
                </CardContent>
             </Card>
           </aside>
