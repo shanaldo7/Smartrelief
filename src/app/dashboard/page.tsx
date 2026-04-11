@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react";
@@ -24,7 +23,7 @@ import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts
 // Dynamically import map to avoid SSR issues with Leaflet
 const InteractiveMap = dynamic(() => import("@/components/Map"), { 
   ssr: false,
-  loading: () => <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground">Initializing Map Engine...</div>
+  loading: () => <div className="h-[450px] w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground border border-dashed font-bold uppercase tracking-widest">Initializing Map Engine...</div>
 });
 
 interface Task {
@@ -286,7 +285,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
           <div className="lg:col-span-3 space-y-8">
-            <Card className="border-none shadow-xl overflow-hidden min-h-[450px] relative">
+            <Card className="border-none shadow-xl overflow-hidden min-h-[450px] relative bg-card">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
                 volunteers={rawVolunteers || []} 
