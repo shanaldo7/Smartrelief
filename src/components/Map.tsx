@@ -37,9 +37,14 @@ const UserIcon = () => (
 
 function ChangeView({ center, zoom, routeBounds }: { center: [number, number], zoom: number, routeBounds?: any }) {
   const map = useMap();
+  
   useEffect(() => {
     if (routeBounds) {
-      map.fitBounds(routeBounds, { padding: [100, 100], animate: true });
+      const currentBounds = map.getBounds();
+      // Only fit bounds if they represent a genuine tactical shift
+      if (!currentBounds.equals(routeBounds)) {
+        map.fitBounds(routeBounds, { padding: [100, 100], animate: true });
+      }
     } else if (
       map && 
       Array.isArray(center) && 
@@ -49,14 +54,15 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
       !isNaN(center[0]) && 
       !isNaN(center[1])
     ) {
-      // Small optimization: only set view if it's actually different to avoid leaflet event loops
       const currentCenter = map.getCenter();
       const dist = Math.sqrt(Math.pow(currentCenter.lat - center[0], 2) + Math.pow(currentCenter.lng - center[1], 2));
+      // Defensive check to prevent rapid map-update loops
       if (dist > 0.0001 || map.getZoom() !== zoom) {
         map.setView(center, zoom);
       }
     }
   }, [center, zoom, map, routeBounds]);
+  
   return null;
 }
 
@@ -93,8 +99,8 @@ export default function InteractiveMap({
         high: createIcon(urgencyColors.high),
         medium: createIcon(urgencyColors.medium),
         low: createIcon(urgencyColors.low),
-        volunteer: createIcon("#3b82f6"), // Blue for Rescuers
-        user: createIcon("#a855f7", true), // Purple for Current Responder
+        volunteer: createIcon("#3b82f6"), 
+        user: createIcon("#a855f7", true), 
       });
       setIsMounted(true);
     };
@@ -104,7 +110,7 @@ export default function InteractiveMap({
 
   const selectedTask = useMemo(() => {
     if (!tasks || !selectedTaskId) return null;
-    return tasks.find(t => t.id === selectedTaskId);
+    return tasks.find(t => t.id === selectedTaskId) || null;
   }, [tasks, selectedTaskId]);
 
   const routeBounds = useMemo(() => {
@@ -142,7 +148,6 @@ export default function InteractiveMap({
         />
         <ChangeView center={center} zoom={zoom} routeBounds={routeBounds} />
         
-        {/* Tactical Route Visualization */}
         {userLocation && selectedTask && selectedTask.latitude && selectedTask.longitude && (
           <>
             <Polyline 
@@ -161,7 +166,6 @@ export default function InteractiveMap({
           </>
         )}
 
-        {/* User Location Marker */}
         {userLocation && (
           <Marker position={userLocation} icon={icons.user}>
             <Popup>
@@ -176,7 +180,6 @@ export default function InteractiveMap({
           </Marker>
         )}
 
-        {/* NGO Task Markers */}
         {tasks.map((task) => (
           task.latitude && task.longitude && (
             <Marker 
@@ -221,7 +224,6 @@ export default function InteractiveMap({
           )
         ))}
 
-        {/* Volunteer / Rescuer Markers */}
         {volunteers.map((vol) => (
           vol.latitude && vol.longitude && (
             <Marker 

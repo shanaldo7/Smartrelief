@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useCallback } from "react";
@@ -25,6 +26,8 @@ const InteractiveMap = dynamic(() => import("@/components/Map"), {
   ssr: false,
   loading: () => <div className="h-[500px] w-full bg-muted animate-pulse rounded-[2.5rem] flex items-center justify-center text-muted-foreground border-4 border-dashed font-black uppercase tracking-[0.3em] text-xs">Initializing Satellite Link...</div>
 });
+
+const EMPTY_ARRAY: any[] = [];
 
 interface Task {
   id: string;
@@ -126,11 +129,12 @@ export default function Dashboard() {
   const { data: activities, isLoading: activitiesLoading } = useCollection<ActivityLog>(activitiesQuery);
 
   const activeTasksForMap = useMemo(() => {
-    return rawTasks?.filter(t => t.status === 'open') || [];
+    if (!rawTasks) return EMPTY_ARRAY;
+    return rawTasks.filter(t => t.status === 'open');
   }, [rawTasks]);
 
   const filteredTasks = useMemo(() => {
-    if (!rawTasks) return [];
+    if (!rawTasks) return EMPTY_ARRAY;
     let filtered = [...rawTasks];
     if (locationFilter !== "all") filtered = filtered.filter(t => t.location === locationFilter);
     if (urgencyFilter !== "all") filtered = filtered.filter(t => t.urgency === urgencyFilter);
@@ -145,7 +149,7 @@ export default function Dashboard() {
   }, [rawTasks, locationFilter, urgencyFilter, categoryFilter]);
 
   const matches = useMemo(() => {
-    if (!rawTasks || !rawVolunteers) return [];
+    if (!rawTasks || !rawVolunteers) return EMPTY_ARRAY;
     const results: Match[] = [];
     rawTasks.filter(t => t.status === 'open').forEach(task => {
       rawVolunteers.forEach(volunteer => {
@@ -177,7 +181,7 @@ export default function Dashboard() {
   }, [rawTasks, rawVolunteers]);
 
   const nearbyOpportunities = useMemo(() => {
-    if (!userLocation || !rawTasks) return [];
+    if (!userLocation || !rawTasks) return EMPTY_ARRAY;
     return rawTasks
       .filter(t => t.status === 'open')
       .map(t => ({
@@ -188,8 +192,9 @@ export default function Dashboard() {
   }, [userLocation, rawTasks]);
 
   const areaImpact = useMemo(() => {
+    if (!rawTasks) return EMPTY_ARRAY;
     const counts: Record<string, number> = {};
-    rawTasks?.filter(t => t.status === 'open').forEach(t => {
+    rawTasks.filter(t => t.status === 'open').forEach(t => {
       counts[t.location] = (counts[t.location] || 0) + 1;
     });
     return Object.entries(counts)
@@ -208,16 +213,23 @@ export default function Dashboard() {
     }, { merge: true });
   }, [db]);
 
+  const updateMapFocus = useCallback((lat: number, lng: number, zoom: number) => {
+    setMapCenter(prev => {
+      if (Math.abs(prev[0] - lat) < 0.0001 && Math.abs(prev[1] - lng) < 0.0001) return prev;
+      return [lat, lng];
+    });
+    setMapZoom(prev => prev === zoom ? prev : zoom);
+  }, []);
+
   const handleTaskSelect = useCallback((taskId: string | null) => {
     setSelectedTaskId(taskId);
     if (taskId) {
       const task = rawTasks?.find(t => t.id === taskId);
       if (task && task.latitude) {
-        setMapCenter([task.latitude, task.longitude]);
-        setMapZoom(14);
+        updateMapFocus(task.latitude, task.longitude, 14);
       }
     }
-  }, [rawTasks]);
+  }, [rawTasks, updateMapFocus]);
 
   const handleFocusEmergency = useCallback(() => {
     if (!rawTasks) return;
@@ -238,15 +250,14 @@ export default function Dashboard() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserLocation([latitude, longitude]);
-        setMapCenter([latitude, longitude]);
-        setMapZoom(13);
+        updateMapFocus(latitude, longitude, 13);
         setIsLocating(false);
         toast({ title: "Position Verified", description: "Your coordinates have been pinned." });
       },
       () => setIsLocating(false),
       { enableHighAccuracy: true }
     );
-  }, [toast]);
+  }, [toast, updateMapFocus]);
 
   const handleAssignVolunteer = useCallback((taskId: string, volunteerName: string) => {
     if (!db) return;
@@ -381,7 +392,7 @@ export default function Dashboard() {
             <Card className="border-4 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] overflow-hidden h-[600px] relative bg-card rounded-[3rem]">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
-                volunteers={rawVolunteers || []} 
+                volunteers={rawVolunteers || EMPTY_ARRAY} 
                 center={mapCenter} 
                 zoom={mapZoom}
                 userLocation={userLocation}
