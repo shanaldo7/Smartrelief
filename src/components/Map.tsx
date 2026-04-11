@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
@@ -44,6 +43,7 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
     if (routeBounds) {
       if (lastRouteBounds.current && lastRouteBounds.current.equals(routeBounds)) return;
       lastRouteBounds.current = routeBounds;
+      
       const currentBounds = map.getBounds();
       if (!currentBounds.equals(routeBounds)) {
         map.fitBounds(routeBounds, { padding: [80, 80], animate: true });
@@ -57,6 +57,7 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
       !isNaN(center[0]) && 
       !isNaN(center[1])
     ) {
+      // Prevent redundant view setting if the center/zoom is already functionally matched
       if (lastCenter.current && 
           Math.abs(lastCenter.current[0] - center[0]) < 0.0001 && 
           Math.abs(lastCenter.current[1] - center[1]) < 0.0001 &&
@@ -69,6 +70,7 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
       
       const currentCenter = map.getCenter();
       const dist = Math.sqrt(Math.pow(currentCenter.lat - center[0], 2) + Math.pow(currentCenter.lng - center[1], 2));
+      
       if (dist > 0.0001 || map.getZoom() !== zoom) {
         map.setView(center, zoom);
       }

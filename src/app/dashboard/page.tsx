@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useCallback } from "react";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc, query, orderBy, limit, deleteField } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Activity, Loader2, BarChart3, CheckCircle, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck, UserMinus } from "lucide-react";
+import { MapPin, AlertTriangle, Activity, Loader2, BarChart3, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck, UserMinus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -216,6 +215,7 @@ export default function Dashboard() {
 
   const updateMapFocus = useCallback((lat: number, lng: number, zoom: number) => {
     setMapCenter(prev => {
+      // Prevent redundant state updates if coordinates match within precision
       if (Math.abs(prev[0] - lat) < 0.0001 && Math.abs(prev[1] - lng) < 0.0001) return prev;
       return [lat, lng];
     });
@@ -225,6 +225,7 @@ export default function Dashboard() {
   const handleTaskSelect = useCallback((taskId: string | null) => {
     setSelectedTaskId(taskId);
     if (taskId) {
+      // Accessing rawTasks here is safe because it's a dependency
       const task = rawTasks?.find(t => t.id === taskId);
       if (task && task.latitude) {
         updateMapFocus(task.latitude, task.longitude, 14);
@@ -420,10 +421,6 @@ export default function Dashboard() {
                 selectedTaskId={selectedTaskId}
                 onTaskSelect={handleTaskSelect}
               />
-              <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md h-10 w-10" onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}><Zap className="h-4 w-4" /></Button>
-                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md h-10 w-10" onClick={() => setMapZoom(prev => Math.max(prev - 1, 3))}><Route className="h-4 w-4" /></Button>
-              </div>
             </Card>
 
             {simulationRole === 'ngo' ? (
