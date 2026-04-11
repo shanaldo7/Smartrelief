@@ -6,9 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc, query, orderBy, limit } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Navigation, ShieldCheck, Briefcase, UserCircle, FilterX, Target, LocateFixed, Route, UserCheck } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Activity, Loader2, BarChart3, CheckCircle, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -23,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const InteractiveMap = dynamic(() => import("@/components/Map"), { 
   ssr: false,
-  loading: () => <div className="h-[500px] w-full bg-muted animate-pulse rounded-3xl flex items-center justify-center text-muted-foreground border-2 border-dashed font-bold uppercase tracking-widest text-xs italic">Initializing Strategic Feed...</div>
+  loading: () => <div className="h-[500px] w-full bg-muted animate-pulse rounded-3xl flex items-center justify-center text-muted-foreground border-2 border-dashed font-bold uppercase tracking-widest text-[10px] italic">Initializing Strategic Feed...</div>
 });
 
 const EMPTY_ARRAY: any[] = [];
@@ -299,11 +300,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="container mx-auto px-4 py-8 max-w-[1400px]">
-        <header className="mb-10 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 border-b pb-8">
+        <header className="mb-8 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 border-b pb-8">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-10 w-10 text-primary" />
-              <h1 className="text-4xl md:text-5xl font-black tracking-tight uppercase leading-tight">
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight uppercase leading-none">
                 Command Hub
               </h1>
             </div>
@@ -312,7 +313,7 @@ export default function Dashboard() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
               </span>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                 Network Status: <span className="text-primary">Operational Sync Active</span>
               </p>
             </div>
@@ -323,7 +324,7 @@ export default function Dashboard() {
               <Button 
                 variant={simulationRole === 'ngo' ? 'default' : 'ghost'} 
                 size="sm"
-                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'ngo' && "shadow-md")}
+                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-4 h-9", simulationRole === 'ngo' && "shadow-sm")}
                 onClick={() => setSimulationRole('ngo')}
               >
                 NGO Control
@@ -331,17 +332,17 @@ export default function Dashboard() {
               <Button 
                 variant={simulationRole === 'volunteer' ? 'default' : 'ghost'} 
                 size="sm"
-                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'volunteer' && "shadow-md")}
+                className={cn("rounded-lg font-bold uppercase text-[10px] tracking-widest px-4 h-9", simulationRole === 'volunteer' && "shadow-sm")}
                 onClick={() => setSimulationRole('volunteer')}
               >
                 Responder
               </Button>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Button 
                 variant="destructive"
-                className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest shadow-lg gap-2 text-[10px]" 
+                className="h-9 px-4 rounded-xl font-bold uppercase tracking-widest shadow-md gap-2 text-[10px]" 
                 onClick={handleFocusEmergency}
               >
                 <AlertTriangle className="h-4 w-4" />
@@ -349,7 +350,7 @@ export default function Dashboard() {
               </Button>
               <Button 
                 variant="outline" 
-                className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest border-2 gap-2 text-[10px]" 
+                className="h-9 px-4 rounded-xl font-bold uppercase tracking-widest border-2 gap-2 text-[10px]" 
                 onClick={handleLocateMe}
                 disabled={isLocating}
               >
@@ -363,8 +364,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-9 space-y-8">
             {/* Professional Filter Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-card p-4 rounded-2xl border shadow-sm">
-               <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 bg-card p-6 rounded-2xl border shadow-sm items-end">
+               <div className="space-y-2">
                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Relief Sector</Label>
                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                    <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Category" /></SelectTrigger>
@@ -377,7 +378,7 @@ export default function Dashboard() {
                    </SelectContent>
                  </Select>
                </div>
-               <div className="space-y-1">
+               <div className="space-y-2">
                  <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Urgency Level</Label>
                  <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
                    <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
@@ -389,7 +390,7 @@ export default function Dashboard() {
                    </SelectContent>
                  </Select>
                </div>
-               <div className="flex items-end">
+               <div>
                  <Button variant="ghost" size="sm" className="w-full rounded-xl font-bold uppercase text-[10px] tracking-widest h-10 border-2 border-dashed" onClick={() => { setCategoryFilter('all'); setUrgencyFilter('all'); setLocationFilter('all'); }}>
                    <FilterX className="h-4 w-4 mr-2" /> Reset Filters
                  </Button>
@@ -407,8 +408,8 @@ export default function Dashboard() {
                 onTaskSelect={handleTaskSelect}
               />
               <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md" onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}><Zap className="h-4 w-4" /></Button>
-                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md" onClick={() => setMapZoom(prev => Math.max(prev - 1, 3))}><Route className="h-4 w-4" /></Button>
+                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md h-10 w-10" onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}><Zap className="h-4 w-4" /></Button>
+                 <Button size="icon" variant="secondary" className="rounded-lg shadow-md h-10 w-10" onClick={() => setMapZoom(prev => Math.max(prev - 1, 3))}><Route className="h-4 w-4" /></Button>
               </div>
             </Card>
 
@@ -428,9 +429,9 @@ export default function Dashboard() {
                            <Badge variant="outline" className="text-[9px] font-bold uppercase border-2">{match.distance}KM Range</Badge>
                            <Target className="h-5 w-5 text-primary" />
                          </div>
-                         <CardTitle className="text-xl font-bold mt-3 leading-tight">Match Detected</CardTitle>
+                         <CardTitle className="text-lg font-bold mt-4 leading-tight">Match Detected</CardTitle>
                       </CardHeader>
-                      <CardContent className="p-5 pt-2 space-y-3 flex-grow">
+                      <CardContent className="p-5 pt-2 space-y-4 flex-grow">
                         <div className="p-3 bg-muted rounded-xl border-l-4 border-destructive">
                           <p className="text-[9px] font-bold uppercase text-muted-foreground mb-1">Incident</p>
                           <p className="font-bold text-xs uppercase truncate">{match.taskTitle}</p>
@@ -442,13 +443,13 @@ export default function Dashboard() {
                       </CardContent>
                       <CardFooter className="p-5 pt-0">
                          <Button className="w-full h-10 font-bold uppercase text-[10px] tracking-widest rounded-xl gap-2 shadow-md" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
-                           <UserCheck className="h-4 w-4" /> Deploy
+                           <UserCheck className="h-4 w-4" /> Deploy Responder
                          </Button>
                       </CardFooter>
                     </Card>
                   )) : (
-                    <div className="col-span-full py-20 text-center border-4 border-dashed rounded-3xl opacity-40">
-                      <p className="font-bold uppercase tracking-widest text-sm italic">No Optimal Matches Found in Sector</p>
+                    <div className="col-span-full py-24 text-center border-4 border-dashed rounded-3xl opacity-40">
+                      <p className="font-bold uppercase tracking-widest text-xs italic">No Optimal Matches Found in Sector</p>
                     </div>
                   )}
                 </TabsContent>
@@ -457,21 +458,21 @@ export default function Dashboard() {
                   {filteredTasks.map(task => (
                     <Card key={task.id} className={cn("border-2 shadow-sm bg-card rounded-2xl overflow-hidden group", task.status === 'completed' && "opacity-40 grayscale")}>
                       <CardHeader className="p-5">
-                        <div className="flex justify-between items-center mb-2">
+                        <div className="flex justify-between items-center mb-4">
                           <Badge className={cn("text-[8px] uppercase font-bold tracking-widest px-2 py-1 rounded-lg", 
                             task.urgency === 'high' ? "bg-destructive text-white" : "bg-primary text-white")}>
                             {task.urgency}
                           </Badge>
-                          <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1">
+                          <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                              <MapPin className="h-3 w-3 text-primary" /> {task.location}
                           </span>
                         </div>
                         <CardTitle className="text-lg font-bold leading-tight truncate">{task.title}</CardTitle>
                       </CardHeader>
-                      <CardContent className="p-5 pt-0 space-y-3">
+                      <CardContent className="p-5 pt-0 space-y-4">
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed font-medium italic">"{task.description}"</p>
                         {task.assignedTo && (
-                          <div className="pt-2 border-t flex items-center gap-2">
+                          <div className="pt-3 border-t flex items-center gap-2">
                             <ShieldCheck className="h-4 w-4 text-accent" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-accent">Responder: {task.assignedTo}</span>
                           </div>
@@ -500,9 +501,9 @@ export default function Dashboard() {
 
                  <TabsContent value="nearby">
                    {!userLocation ? (
-                     <div className="py-24 text-center border-4 border-dashed rounded-3xl bg-card shadow-inner">
-                       <Navigation className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6 animate-pulse" />
-                       <h3 className="text-2xl font-bold text-foreground uppercase tracking-tight mb-2">Location Required</h3>
+                     <div className="py-32 text-center border-4 border-dashed rounded-3xl bg-card shadow-inner">
+                       <Navigation className="h-12 w-12 text-muted-foreground/20 mx-auto mb-6 animate-pulse" />
+                       <h3 className="text-xl font-bold text-foreground uppercase tracking-tight mb-2">Location Required</h3>
                        <p className="text-sm text-muted-foreground font-medium italic max-w-sm mx-auto mb-8">Sync your tactical position to identify real-time humanitarian needs in your immediate area.</p>
                        <Button onClick={handleLocateMe} className="h-12 px-10 rounded-xl font-bold uppercase text-xs tracking-widest shadow-xl">Sync Tactical GPS</Button>
                      </div>
@@ -518,11 +519,11 @@ export default function Dashboard() {
                             </div>
                             <CardHeader className="p-5 pb-2">
                               <CardTitle className="text-lg font-bold uppercase truncate">{task.title}</CardTitle>
-                              <CardDescription className="font-bold text-[10px] text-muted-foreground tracking-widest uppercase">{task.category} • {task.location}</CardDescription>
+                              <CardDescription className="font-bold text-[10px] text-muted-foreground tracking-widest uppercase mt-1">{task.category} • {task.location}</CardDescription>
                             </CardHeader>
                             <CardContent className="p-5 pt-2 space-y-4 flex-grow">
                                <p className="text-xs text-muted-foreground leading-relaxed italic font-medium line-clamp-3">"{task.description}"</p>
-                               <div className="flex flex-wrap gap-1">
+                               <div className="flex flex-wrap gap-2">
                                  {task.skillsRequired.map((s, i) => (
                                    <Badge key={i} variant="secondary" className="text-[8px] font-bold uppercase py-0.5 px-2 border">{s}</Badge>
                                  ))}
@@ -546,7 +547,7 @@ export default function Dashboard() {
             {/* Live Operational Feed */}
             <Card className="shadow-lg border-2 bg-card rounded-3xl overflow-hidden">
                <CardHeader className="bg-muted/30 border-b p-6">
-                 <CardTitle className="text-sm font-bold flex items-center gap-3 text-primary uppercase tracking-widest">
+                 <CardTitle className="text-xs font-bold flex items-center gap-3 text-primary uppercase tracking-widest">
                    <Activity className="h-5 w-5 text-accent" />
                    Tactical Feed
                  </CardTitle>
@@ -560,8 +561,8 @@ export default function Dashboard() {
                         <div className={cn("absolute top-0 right-0 w-1.5 h-full opacity-50", 
                            act.type === 'new_task' ? "bg-primary" : 
                            act.type === 'assigned' ? "bg-accent" : "bg-emerald-500")} />
-                        <p className="font-bold text-foreground text-[11px] leading-tight uppercase mb-1">{act.message}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">
+                        <p className="font-bold text-foreground text-[10px] leading-tight uppercase mb-1">{act.message}</p>
+                        <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-tight">
                           {act.timestamp?.toMillis ? new Date(act.timestamp.toMillis()).toLocaleTimeString() : 'PENDING SYNC'}
                         </p>
                      </div>
@@ -574,7 +575,7 @@ export default function Dashboard() {
 
             <Card className="shadow-lg border-2 bg-card rounded-3xl overflow-hidden">
               <CardHeader className="p-6 bg-muted/30 border-b">
-                <CardTitle className="text-sm font-bold flex items-center gap-3 uppercase tracking-widest text-primary">
+                <CardTitle className="text-xs font-bold flex items-center gap-3 uppercase tracking-widest text-primary">
                   <BarChart3 className="h-5 w-5" /> Regional Analytics
                 </CardTitle>
               </CardHeader>
