@@ -4,12 +4,12 @@
 import { useState, useMemo } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
+import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -114,7 +114,7 @@ export default function Dashboard() {
 
   const areaImpact = useMemo(() => {
     const counts: Record<string, number> = {};
-    rawTasks?.forEach(t => {
+    rawTasks?.filter(t => t.status === 'open').forEach(t => {
       counts[t.location] = (counts[t.location] || 0) + 1;
     });
     return Object.entries(counts)
@@ -185,6 +185,33 @@ export default function Dashboard() {
     }
   };
 
+  const handleAssignVolunteer = (taskId: string, volunteerName: string) => {
+    if (!db) return;
+    const taskRef = doc(db, "tasks", taskId);
+    updateDocumentNonBlocking(taskRef, {
+      status: "assigned",
+      assignedTo: volunteerName,
+      updatedAt: serverTimestamp(),
+    });
+    toast({
+      title: "Task Assigned",
+      description: `Task has been marked as assigned and removed from active matching.`,
+    });
+  };
+
+  const handleMarkAsCompleted = (taskId: string) => {
+    if (!db) return;
+    const taskRef = doc(db, "tasks", taskId);
+    updateDocumentNonBlocking(taskRef, {
+      status: "completed",
+      updatedAt: serverTimestamp(),
+    });
+    toast({
+      title: "Task Completed",
+      description: `The task has been successfully fulfilled.`,
+    });
+  };
+
   if (isUserLoading || tasksLoading || volunteersLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -218,7 +245,7 @@ export default function Dashboard() {
             <div className="flex h-10 items-center gap-4 bg-card px-4 rounded-xl shadow-sm border">
                <div className="flex items-center gap-1.5 border-r pr-4">
                  <Activity className="h-4 w-4 text-primary" />
-                 <span className="text-sm font-bold">{rawTasks?.length || 0}</span>
+                 <span className="text-sm font-bold">{rawTasks?.filter(t => t.status === 'open').length || 0}</span>
                  <span className="text-[10px] text-muted-foreground uppercase font-semibold ml-1">Active Needs</span>
                </div>
                <div className="flex items-center gap-1.5">
@@ -302,6 +329,12 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
+                  <div className="p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-500 shadow-sm">
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase mb-1">Efficiency Log</p>
+                    <p className="text-[10px] text-emerald-600 leading-tight">
+                      Once a task is fulfilled, it is automatically marked as completed and removed from active matching.
+                    </p>
+                  </div>
                </CardContent>
             </Card>
           </aside>
@@ -325,7 +358,7 @@ export default function Dashboard() {
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {matches.length > 0 ? (
                      matches.filter(m => locationFilter === 'all' || m.reasons.some(r => r === "Geographic Proximity")).slice(0, 9).map((match, i) => (
-                       <Card key={`${match.taskId}-${match.volunteerId}`} className="relative border-none shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 bg-card group">
+                       <Card key={`${match.taskId}-${match.volunteerId}`} className="relative border-none shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 bg-card group flex flex-col">
                          <div className="absolute top-0 right-0 p-4">
                            <div className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
                              <Zap className="h-3 w-3" /> {match.score} Score
@@ -337,7 +370,7 @@ export default function Dashboard() {
                            </CardTitle>
                            <CardDescription>Strategic pairing</CardDescription>
                          </CardHeader>
-                         <CardContent className="space-y-4">
+                         <CardContent className="space-y-4 flex-grow">
                            <div className="p-3 bg-muted/30 rounded-xl">
                              <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Impact Goal</p>
                              <p className="font-bold text-foreground truncate">{match.taskTitle}</p>
@@ -357,6 +390,15 @@ export default function Dashboard() {
                              ))}
                            </div>
                          </CardContent>
+                         <CardFooter className="pt-2">
+                            <Button 
+                              className="w-full gap-2" 
+                              size="sm"
+                              onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" /> Assign Volunteer
+                            </Button>
+                         </CardFooter>
                        </Card>
                      ))
                    ) : (
@@ -372,7 +414,15 @@ export default function Dashboard() {
                <TabsContent value="tasks" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {filteredTasks.map(task => (
-                     <Card key={task.id} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card">
+                     <Card key={task.id} className={cn(
+                       "border-none shadow-sm hover:shadow-md transition-shadow bg-card relative",
+                       task.status === 'completed' && "opacity-60"
+                     )}>
+                       {task.status === 'completed' && (
+                         <div className="absolute top-2 right-2">
+                           <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">Completed</Badge>
+                         </div>
+                       )}
                        <CardHeader className="pb-2">
                          <div className="flex justify-between items-start mb-3">
                            <Badge className={cn(
@@ -398,7 +448,24 @@ export default function Dashboard() {
                              </Badge>
                            ))}
                          </div>
+                         {task.status === 'assigned' && (
+                           <div className="p-2 bg-blue-50 text-blue-700 text-xs rounded-lg font-bold">
+                             Currently Assigned
+                           </div>
+                         )}
                        </CardContent>
+                       {task.status === 'open' || task.status === 'assigned' ? (
+                         <CardFooter className="pt-0">
+                           <Button 
+                             variant="ghost" 
+                             size="sm" 
+                             className="w-full text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                             onClick={() => handleMarkAsCompleted(task.id)}
+                           >
+                             <CheckCircle className="h-3 w-3 mr-2" /> Mark Completed
+                           </Button>
+                         </CardFooter>
+                       ) : null}
                      </Card>
                    ))}
                    {filteredTasks.length === 0 && (
