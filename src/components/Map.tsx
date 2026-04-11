@@ -1,20 +1,15 @@
 
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
-import L from "leaflet"
-import "leaflet/dist/leaflet.css"
+import type { Icon } from "leaflet"
 
-// Fix for default Leaflet icon not appearing in Next.js
-const getIcon = (color: string) => {
-  return new L.DivIcon({
-    className: "custom-div-icon",
-    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-  });
-};
+// Dynamic import for L to avoid SSR issues
+let L: any;
+if (typeof window !== 'undefined') {
+  L = require('leaflet');
+}
 
 const urgencyColors = {
   high: "#ef4444",
@@ -32,19 +27,43 @@ interface MapProps {
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, zoom);
+    if (map) {
+      map.setView(center, zoom);
+    }
   }, [center, zoom, map]);
   return null;
 }
 
 export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 78.9629], zoom = 5 }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
+  const [icons, setIcons] = useState<Record<string, any>>({});
 
   useEffect(() => {
     setIsMounted(true);
+    
+    // Initialize icons on the client only
+    if (typeof window !== 'undefined' && L) {
+      const createIcon = (color: string) => {
+        return new L.DivIcon({
+          className: "custom-div-icon",
+          html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.4);"></div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+      };
+
+      setIcons({
+        high: createIcon(urgencyColors.high),
+        medium: createIcon(urgencyColors.medium),
+        low: createIcon(urgencyColors.low),
+        volunteer: createIcon("#3b82f6"),
+      });
+    }
   }, []);
 
-  if (!isMounted) return <div className="h-full w-full bg-muted animate-pulse rounded-xl" />;
+  if (!isMounted || !L || Object.keys(icons).length === 0) {
+    return <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground">Loading Map Components...</div>;
+  }
 
   return (
     <MapContainer center={center} zoom={zoom} scrollWheelZoom={false} className="h-full w-full">
@@ -59,7 +78,7 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
           <Marker 
             key={task.id} 
             position={[task.latitude, task.longitude]} 
-            icon={getIcon(urgencyColors[task.urgency as keyof typeof urgencyColors] || urgencyColors.low)}
+            icon={icons[task.urgency as keyof typeof icons] || icons.low}
           >
             <Popup>
               <div className="space-y-1">
@@ -84,7 +103,7 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
           <Marker 
             key={vol.id} 
             position={[vol.latitude, vol.longitude]} 
-            icon={getIcon("#3b82f6")}
+            icon={icons.volunteer}
           >
             <Popup>
               <div className="space-y-1">
