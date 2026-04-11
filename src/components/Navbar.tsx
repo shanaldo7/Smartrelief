@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link";
-import { Heart, LayoutDashboard, UserPlus, ClipboardList } from "lucide-react";
+import { Zap, LayoutDashboard, UserPlus, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
@@ -10,16 +10,18 @@ export function Navbar() {
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/tasks/new", label: "Post Task", icon: ClipboardList },
-    { href: "/volunteers/new", label: "Join as Volunteer", icon: UserPlus },
+    { href: "/tasks/new", label: "Request Help", icon: ClipboardList },
+    { href: "/volunteers/new", label: "Volunteer", icon: UserPlus },
   ];
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4 mx-auto">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Heart className="h-6 w-6 text-primary" fill="currentColor" />
-          <span className="text-xl font-bold tracking-tight text-primary font-headline">Kindred Connect</span>
+          <div className="bg-primary p-1.5 rounded-lg">
+            <Zap className="h-5 w-5 text-primary-foreground" fill="currentColor" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-primary font-headline">SmartRelief</span>
         </Link>
         <div className="hidden md:flex gap-6">
           {navItems.map((item) => (
@@ -35,9 +37,6 @@ export function Navbar() {
               {item.label}
             </Link>
           ))}
-        </div>
-        <div className="flex items-center md:hidden">
-          {/* Mobile simple nav could go here, for now just links are fine */}
         </div>
       </div>
     </nav>
