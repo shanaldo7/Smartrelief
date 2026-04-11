@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react";
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
-import { collection, query, orderBy, serverTimestamp, doc } from "firebase/firestore";
+import { collection, query, serverTimestamp, doc } from "firebase/firestore";
 import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +22,7 @@ interface Task {
   skillsRequired: string[];
   status: string;
   ownerId: string;
+  createdAt?: any;
 }
 
 interface Volunteer {
@@ -30,6 +30,7 @@ interface Volunteer {
   name: string;
   location: string;
   skills: string[];
+  createdAt?: any;
 }
 
 interface Match {
@@ -55,31 +56,51 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
 
-  // Memoized queries - now strictly dependent on auth state being fully resolved
+  // Simplified queries to avoid missing index errors (handled via in-memory sorting)
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
-    return query(collection(db, "tasks"), orderBy("priority", "desc"), orderBy("createdAt", "desc"));
+    return collection(db, "tasks");
   }, [db, user, isUserLoading]);
 
   const volunteersQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
-    return query(collection(db, "volunteerProfiles"), orderBy("createdAt", "desc"));
+    return collection(db, "volunteerProfiles");
   }, [db, user, isUserLoading]);
 
-  const { data: tasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
-  const { data: volunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
+  const { data: rawTasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
+  const { data: rawVolunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
+
+  // Sort tasks in memory: priority (desc), then createdAt (desc)
+  const sortedTasks = useMemo(() => {
+    if (!rawTasks) return [];
+    return [...rawTasks].sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      const dateA = a.createdAt?.toMillis?.() || 0;
+      const dateB = b.createdAt?.toMillis?.() || 0;
+      return dateB - dateA;
+    });
+  }, [rawTasks]);
+
+  // Sort volunteers in memory: createdAt (desc)
+  const sortedVolunteers = useMemo(() => {
+    if (!rawVolunteers) return [];
+    return [...rawVolunteers].sort((a, b) => {
+      const dateA = a.createdAt?.toMillis?.() || 0;
+      const dateB = b.createdAt?.toMillis?.() || 0;
+      return dateB - dateA;
+    });
+  }, [rawVolunteers]);
 
   // Calculate matches dynamically based on data
   const matches = useMemo(() => {
-    if (!tasks || !volunteers) return [];
+    if (!sortedTasks || !sortedVolunteers) return [];
     
     const results: Match[] = [];
-    tasks.filter(t => t.status === 'open').forEach(task => {
-      volunteers.forEach(volunteer => {
+    sortedTasks.filter(t => t.status === 'open').forEach(task => {
+      sortedVolunteers.forEach(volunteer => {
         let score = 0;
         const reasons: string[] = [];
 
-        // Skill Match
         const matchedSkills = task.skillsRequired.filter(skill => 
           volunteer.skills.some(vSkill => vSkill.toLowerCase() === skill.toLowerCase())
         );
@@ -88,7 +109,6 @@ export default function Dashboard() {
           reasons.push(`${matchedSkills.length} skills matched`);
         }
 
-        // Location Match
         if (task.location.toLowerCase() === volunteer.location.toLowerCase()) {
           score += 25;
           reasons.push("Local volunteer");
@@ -108,15 +128,15 @@ export default function Dashboard() {
     });
 
     return results.sort((a, b) => b.score - a.score);
-  }, [tasks, volunteers]);
+  }, [sortedTasks, sortedVolunteers]);
 
   const areaImpact = useMemo(() => {
     const counts: Record<string, number> = {};
-    tasks?.forEach(t => {
+    sortedTasks.forEach(t => {
       counts[t.location] = (counts[t.location] || 0) + 1;
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [tasks]);
+  }, [sortedTasks]);
 
   const handleImportData = async () => {
     if (!db || !user) {
@@ -137,10 +157,10 @@ export default function Dashboard() {
       }
       toast({
         title: "NGO Data Imported",
-        description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks into Firestore.`,
+        description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks.`,
       });
     } catch (error) {
-      // Errors handled by FirebaseErrorListener
+      // Handled by global listener
     } finally {
       setIsImporting(false);
     }
@@ -179,12 +199,12 @@ export default function Dashboard() {
             <div className="flex h-10 items-center gap-4 bg-card px-4 rounded-xl shadow-sm border">
                <div className="flex items-center gap-1.5 border-r pr-4">
                  <Activity className="h-4 w-4 text-primary" />
-                 <span className="text-sm font-bold">{(tasks || []).length}</span>
+                 <span className="text-sm font-bold">{sortedTasks.length}</span>
                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Needs</span>
                </div>
                <div className="flex items-center gap-1.5">
                  <Users className="h-4 w-4 text-accent" />
-                 <span className="text-sm font-bold">{(volunteers || []).length}</span>
+                 <span className="text-sm font-bold">{sortedVolunteers.length}</span>
                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rescuers</span>
                </div>
             </div>
@@ -235,7 +255,7 @@ export default function Dashboard() {
                            <CardTitle className="text-lg flex items-center gap-2 font-bold">
                              Recommendation
                            </CardTitle>
-                           <CardDescription>Matching volunteer profile to NGO task</CardDescription>
+                           <CardDescription>Volunteer to task pairing</CardDescription>
                          </CardHeader>
                          <CardContent className="space-y-4">
                            <div className="p-3 bg-muted/30 rounded-xl">
@@ -260,7 +280,7 @@ export default function Dashboard() {
                      <div className="col-span-full py-32 text-center bg-card rounded-3xl border-2 border-dashed">
                        <Zap className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
                        <h3 className="text-xl font-bold">No High-Confidence Matches</h3>
-                       <p className="text-muted-foreground mt-1">Register more volunteers or tasks to see AI recommendations.</p>
+                       <p className="text-muted-foreground mt-1">Register more rescuers or tasks to see recommendations.</p>
                      </div>
                    )}
                  </div>
@@ -268,7 +288,7 @@ export default function Dashboard() {
 
                <TabsContent value="tasks" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {(tasks || []).map(task => (
+                   {sortedTasks.map(task => (
                      <Card key={task.id} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card">
                        <CardHeader className="pb-2">
                          <div className="flex justify-between items-start mb-3">
@@ -303,7 +323,7 @@ export default function Dashboard() {
 
                <TabsContent value="volunteers" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {(volunteers || []).map(volunteer => (
+                   {sortedVolunteers.map(volunteer => (
                      <Card key={volunteer.id} className="border-none shadow-sm bg-card">
                        <CardHeader className="pb-2">
                          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold mb-3">
