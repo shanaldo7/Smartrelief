@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, query, orderBy, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,23 +51,23 @@ const SAMPLE_NGO_DATA = [
 
 export default function Dashboard() {
   const db = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
 
-  // Memoized queries - now dependent on user to avoid race conditions with auth
+  // Memoized queries - now strictly dependent on auth state being fully resolved
   const tasksQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user || isUserLoading) return null;
     return query(collection(db, "tasks"), orderBy("priority", "desc"), orderBy("createdAt", "desc"));
-  }, [db, user]);
+  }, [db, user, isUserLoading]);
 
   const volunteersQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
+    if (!db || !user || isUserLoading) return null;
     return query(collection(db, "volunteerProfiles"), orderBy("createdAt", "desc"));
-  }, [db, user]);
+  }, [db, user, isUserLoading]);
 
-  const { data: tasks = [] } = useCollection<Task>(tasksQuery);
-  const { data: volunteers = [] } = useCollection<Volunteer>(volunteersQuery);
+  const { data: tasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
+  const { data: volunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
 
   // Calculate matches dynamically based on data
   const matches = useMemo(() => {
@@ -145,6 +145,17 @@ export default function Dashboard() {
       setIsImporting(false);
     }
   };
+
+  if (isUserLoading || tasksLoading || volunteersLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <div className="flex-grow flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
