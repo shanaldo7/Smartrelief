@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target, LocateFixed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -59,13 +60,27 @@ interface Match {
   taskTitle: string;
   volunteerName: string;
   location: string;
+  distance: string;
+}
+
+// Haversine formula to calculate distance in KM
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 const SAMPLE_NGO_DATA = [
   { title: "Critical Food Supply Chain", description: "Strategic distribution network for 1500+ displaced families in North Sector.", skillsRequired: ["Logistics", "Operations"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "WFP Operational Partner" },
   { title: "Mobile Trauma Unit", description: "Emergency clinical support for high-impact zones in Central Delhi.", skillsRequired: ["Healthcare", "Emergency Medicine"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "high", priority: 3, status: "open", submittedBy: "Medical Corps" },
   { title: "Relief Logistics Hub", description: "Tier 1 warehouse management for incoming international aid supplies.", skillsRequired: ["Logistics", "Inventory"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "medium", priority: 2, status: "open", submittedBy: "Logistics Cluster" },
-  { title: "Response Comms Center", description: "Coordinating field data for inter-agency disaster response teams.", skillsRequired: ["Admin", "IT Support"], location: "Delhi", latitude: 28.7041, longitude: 77.1025, urgency: "low", priority: 1, status: "open", submittedBy: "Emergency Comms NGO" },
 ];
 
 const chartConfig = {
@@ -133,36 +148,55 @@ export default function Dashboard() {
     const results: Match[] = [];
     rawTasks.filter(t => t.status === 'open').forEach(task => {
       sortedVolunteers.forEach(volunteer => {
+        const dist = getDistance(
+          task.latitude, task.longitude,
+          volunteer.latitude, volunteer.longitude
+        );
+
         let score = 0;
         const reasons: string[] = [];
 
+        // 1. Proximity Scoring (HEAVY WEIGHT - SMART LOGIC)
+        // Closer is much better. Max bonus of 150 points for very close proximity.
+        const proximityScore = Math.max(0, 150 - (dist / 2)); 
+        score += proximityScore;
+        
+        if (dist < 5) {
+          reasons.push("Critical Proximity (<5km)");
+        } else if (dist < 25) {
+          reasons.push("Immediate Sector (<25km)");
+        } else if (dist < 100) {
+          reasons.push("Rapid Deployment (<100km)");
+        }
+
+        // 2. Skill Alignment
         const matchedSkills = task.skillsRequired.filter(skill => 
           volunteer.skills.some(vSkill => vSkill.toLowerCase() === skill.toLowerCase())
         );
         if (matchedSkills.length > 0) {
-          score += matchedSkills.length * 30;
-          reasons.push(`${matchedSkills.length} Core Competencies`);
+          score += matchedSkills.length * 40;
+          reasons.push(`${matchedSkills.length} Required Skills`);
         }
 
-        if (task.location.toLowerCase() === volunteer.location.toLowerCase()) {
-          score += 60;
-          reasons.push("Rapid Response (Local)");
-        }
+        // 3. Urgency / Priority
+        score += (task.priority * 20);
 
-        if (score > 40) {
+        if (score > 60) {
           results.push({
             taskId: task.id,
             volunteerId: volunteer.id,
-            score: score + (task.priority * 15),
+            score: Math.round(score),
             reasons,
             taskTitle: task.title,
             volunteerName: volunteer.name,
-            location: volunteer.location
+            location: task.location,
+            distance: dist.toFixed(1)
           });
         }
       });
     });
 
+    // Sort by score (which is now dominated by distance and priority)
     return results.sort((a, b) => b.score - a.score);
   }, [rawTasks, sortedVolunteers]);
 
@@ -377,9 +411,6 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 text-xs font-bold">
                     <div className="w-3.5 h-3.5 rounded-full bg-primary border-2 border-white shadow-sm" /> Active Responder
                   </div>
-                  <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full bg-purple-600 border-2 border-white shadow-sm ring-2 ring-purple-100 dark:ring-purple-900/30" /> Your Location
-                  </div>
                 </div>
               </div>
               <div className="absolute bottom-6 left-6 z-[1000] flex gap-3">
@@ -405,14 +436,15 @@ export default function Dashboard() {
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {matches.length > 0 ? (
                      matches.filter(m => locationFilter === 'all' || m.location === locationFilter).slice(0, 9).map((match, i) => (
-                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-2 shadow-lg hover:shadow-2xl transition-all duration-300 bg-card group flex flex-col relative overflow-hidden rounded-3xl group">
+                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-2 shadow-lg hover:shadow-2xl transition-all duration-300 bg-card group flex flex-col relative overflow-hidden rounded-3xl">
                          <div className="absolute top-0 right-0 p-5">
                            <div className="bg-primary/10 text-primary text-[10px] font-black uppercase px-4 py-1.5 rounded-full flex items-center gap-2 border-2 border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                             <Zap className="h-4 w-4" /> Score: {match.score}
+                             <LocateFixed className="h-4 w-4" /> {match.distance}km
                            </div>
                          </div>
                          <CardHeader className="pb-4">
                            <CardTitle className="text-xl font-black text-foreground">Strategic Allocation</CardTitle>
+                           <CardDescription className="text-[10px] font-black uppercase text-primary">Proximity Score: {match.score}</CardDescription>
                          </CardHeader>
                          <CardContent className="space-y-5 flex-grow">
                            <div className="p-4 bg-muted/50 rounded-2xl border-l-4 border-destructive space-y-1">
@@ -420,7 +452,7 @@ export default function Dashboard() {
                              <p className="font-extrabold text-foreground text-sm leading-snug">{match.taskTitle}</p>
                            </div>
                            <div className="p-4 bg-primary/5 rounded-2xl border-l-4 border-primary space-y-1">
-                             <p className="text-[10px] font-black text-primary uppercase tracking-widest">Recommended Responder</p>
+                             <p className="text-[10px] font-black text-primary uppercase tracking-widest">Closest Responder</p>
                              <p className="font-extrabold text-foreground text-sm">{match.volunteerName}</p>
                            </div>
                            <div className="flex flex-wrap gap-2">
@@ -599,14 +631,9 @@ export default function Dashboard() {
                </CardHeader>
                <CardContent className="space-y-5 pt-8 p-6">
                   <div className="p-5 bg-card rounded-2xl border-l-8 border-emerald-500 shadow-sm text-[12px] font-bold leading-relaxed">
-                    Centering on your location identifies local needs where immediate impact is possible. 
-                    <span className="block mt-2 text-emerald-600 font-black tracking-widest uppercase text-[10px]">Sync complete.</span>
+                    Distance-based matching is active. Closest responders are prioritized for mission assignment.
+                    <span className="block mt-2 text-emerald-600 font-black tracking-widest uppercase text-[10px]">Strategic Sync Active.</span>
                   </div>
-                  {selectedTaskId && userLocation && (
-                    <div className="p-5 bg-primary/5 rounded-2xl border-l-8 border-primary shadow-sm text-[12px] font-bold leading-relaxed animate-pulse">
-                      Tactical overlay rendering direct response vector to incident site. Deploy immediately.
-                    </div>
-                  )}
                </CardContent>
             </Card>
           </aside>
