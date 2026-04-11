@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -255,8 +255,28 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Strategic real-time mapping and resource mobilization.</p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <div className="flex items-center gap-2 mr-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-10 w-10 shadow-sm"
+                onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}
+                title="Zoom In"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-10 w-10 shadow-sm"
+                onClick={() => setMapZoom(prev => Math.max(prev - 1, 2))}
+                title="Zoom Out"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+            </div>
             <Button variant="outline" className="gap-2" onClick={handleFocusCritical}>
-              <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical Area
+              <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical
             </Button>
             <Button 
               variant="default" 

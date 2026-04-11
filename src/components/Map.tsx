@@ -102,7 +102,7 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
         id="map"
         center={center} 
         zoom={zoom} 
-        scrollWheelZoom={false} 
+        scrollWheelZoom={true} 
         className="h-full w-full"
         style={{ height: "450px", width: "100%" }}
       >
