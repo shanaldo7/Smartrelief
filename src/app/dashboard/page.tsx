@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target, LocateFixed } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target, LocateFixed, Briefcase, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -39,6 +39,7 @@ interface Task {
   status: string;
   ownerId: string;
   submittedBy: string;
+  assignedTo?: string;
   createdAt?: any;
 }
 
@@ -94,6 +95,7 @@ export default function Dashboard() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+  const [simulationRole, setSimulationRole] = useState<"ngo" | "volunteer">("ngo");
   const [isImporting, setIsImporting] = useState(false);
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
@@ -133,6 +135,11 @@ export default function Dashboard() {
     });
   }, [rawTasks, locationFilter]);
 
+  const myAssignments = useMemo(() => {
+    if (!rawTasks || !user) return [];
+    return rawTasks.filter(t => t.assignedTo === (user.displayName || "Anonymous Volunteer"));
+  }, [rawTasks, user]);
+
   const sortedVolunteers = useMemo(() => {
     if (!rawVolunteers) return [];
     return [...rawVolunteers].sort((a, b) => {
@@ -157,7 +164,6 @@ export default function Dashboard() {
         const reasons: string[] = [];
 
         // 1. Proximity Scoring (HEAVY WEIGHT - SMART LOGIC)
-        // Closer is much better. Max bonus of 150 points for very close proximity.
         const proximityScore = Math.max(0, 150 - (dist / 2)); 
         score += proximityScore;
         
@@ -165,8 +171,6 @@ export default function Dashboard() {
           reasons.push("Critical Proximity (<5km)");
         } else if (dist < 25) {
           reasons.push("Immediate Sector (<25km)");
-        } else if (dist < 100) {
-          reasons.push("Rapid Deployment (<100km)");
         }
 
         // 2. Skill Alignment
@@ -196,9 +200,19 @@ export default function Dashboard() {
       });
     });
 
-    // Sort by score (which is now dominated by distance and priority)
     return results.sort((a, b) => b.score - a.score);
   }, [rawTasks, sortedVolunteers]);
+
+  const nearbyOpportunities = useMemo(() => {
+    if (!userLocation || !rawTasks) return [];
+    return rawTasks
+      .filter(t => t.status === 'open')
+      .map(t => ({
+        ...t,
+        distance: getDistance(userLocation[0], userLocation[1], t.latitude, t.longitude)
+      }))
+      .sort((a, b) => a.distance - b.distance);
+  }, [userLocation, rawTasks]);
 
   const areaImpact = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -239,7 +253,7 @@ export default function Dashboard() {
 
   const handleLocateMe = () => {
     if (!navigator.geolocation) {
-      toast({ variant: "destructive", title: "Access Denied", description: "Geolocation services are required for tactical pathing." });
+      toast({ variant: "destructive", title: "Access Denied", description: "Geolocation services are required." });
       return;
     }
 
@@ -253,9 +267,9 @@ export default function Dashboard() {
         setIsLocating(false);
         toast({ title: "Coordinates Locked", description: "Your current responder position has been verified." });
       },
-      (error) => {
+      () => {
         setIsLocating(false);
-        toast({ variant: "destructive", title: "Sync Failed", description: "Ensure location permissions are enabled for this domain." });
+        toast({ variant: "destructive", title: "Sync Failed", description: "Check browser permissions." });
       },
       { enableHighAccuracy: true }
     );
@@ -275,7 +289,7 @@ export default function Dashboard() {
           updatedAt: serverTimestamp(),
         }, { merge: true });
       }
-      toast({ title: "Database Synchronized", description: "Imported verified humanitarian missions from international partners." });
+      toast({ title: "Database Synchronized", description: "Imported verified humanitarian missions." });
     } catch (error) { } finally {
       setIsImporting(false);
     }
@@ -289,7 +303,7 @@ export default function Dashboard() {
       assignedTo: volunteerName,
       updatedAt: serverTimestamp(),
     });
-    toast({ title: "Mission Assigned", description: `${volunteerName} is now leading field operations for this request.` });
+    toast({ title: "Mission Assigned", description: `${volunteerName} has been deployed.` });
   };
 
   const handleMarkAsCompleted = (taskId: string) => {
@@ -300,7 +314,7 @@ export default function Dashboard() {
       updatedAt: serverTimestamp(),
     });
     if (selectedTaskId === taskId) setSelectedTaskId(null);
-    toast({ title: "Mission Successful", description: `Field request has been marked as resolved and logged.` });
+    toast({ title: "Mission Successful", description: `Field request resolved.` });
   };
 
   if (isUserLoading || tasksLoading || volunteersLoading) {
@@ -310,7 +324,7 @@ export default function Dashboard() {
         <div className="flex-grow flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Fleet Data...</p>
+            <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Synchronizing Tactical Grid...</p>
           </div>
         </div>
       </div>
@@ -325,43 +339,49 @@ export default function Dashboard() {
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tight font-headline text-foreground flex items-center gap-3">
               <ShieldCheck className="h-10 w-10 text-primary" />
-              Operational Command
+              Command Center
             </h1>
             <p className="text-muted-foreground font-semibold flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Real-time Humanitarian Grid Active
+              Role: <span className="text-foreground uppercase font-black">{simulationRole} Perspective</span>
             </p>
           </div>
-          <div className="flex flex-wrap gap-4">
-            <Button 
-              variant="outline" 
-              className="h-12 px-6 rounded-xl font-bold gap-2 border-2 hover:bg-primary/5 hover:text-primary transition-all" 
-              onClick={handleLocateMe}
-              disabled={isLocating}
-            >
-              <Navigation className={cn("h-5 w-5", isLocating && "animate-pulse")} />
-              {isLocating ? "Locating..." : "Verify Position"}
-            </Button>
-            <Button 
-              variant="default" 
-              className="h-12 px-6 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2"
-              onClick={handleFetchNGOData}
-              disabled={isImporting}
-            >
-              <Database className="h-5 w-5" />
-              {isImporting ? "Importing Data..." : "Sync Global Intel"}
-            </Button>
-            <div className="flex h-12 items-center gap-6 bg-card border-2 px-6 rounded-xl shadow-sm">
-               <div className="flex items-center gap-2 border-r pr-6">
-                 <Target className="h-5 w-5 text-destructive" />
-                 <span className="text-lg font-black">{rawTasks?.filter(t => t.status === 'open').length || 0}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-black ml-1">Open Risks</span>
-               </div>
-               <div className="flex items-center gap-2">
-                 <Users className="h-5 w-5 text-primary" />
-                 <span className="text-lg font-black">{sortedVolunteers.length}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-black ml-1">Responders</span>
-               </div>
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="bg-muted p-1 rounded-2xl flex gap-1 border-2">
+              <Button 
+                variant={simulationRole === 'ngo' ? 'default' : 'ghost'} 
+                className={cn("rounded-xl font-black uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'ngo' && "shadow-lg")}
+                onClick={() => setSimulationRole('ngo')}
+              >
+                <Briefcase className="h-4 w-4 mr-2" /> NGO Panel
+              </Button>
+              <Button 
+                variant={simulationRole === 'volunteer' ? 'default' : 'ghost'} 
+                className={cn("rounded-xl font-black uppercase text-[10px] tracking-widest px-6 h-10", simulationRole === 'volunteer' && "shadow-lg")}
+                onClick={() => setSimulationRole('volunteer')}
+              >
+                <UserCircle className="h-4 w-4 mr-2" /> Volunteer Panel
+              </Button>
+            </div>
+            <div className="flex gap-4">
+              <Button 
+                variant="outline" 
+                className="h-12 px-6 rounded-xl font-bold gap-2 border-2" 
+                onClick={handleLocateMe}
+                disabled={isLocating}
+              >
+                <Navigation className={cn("h-5 w-5", isLocating && "animate-pulse")} />
+                {isLocating ? "Locating..." : "Detect Position"}
+              </Button>
+              <Button 
+                variant="default" 
+                className="h-12 px-6 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2"
+                onClick={handleFetchNGOData}
+                disabled={isImporting}
+              >
+                <Database className="h-5 w-5" />
+                Sync Data
+              </Button>
             </div>
           </div>
         </header>
@@ -379,37 +399,19 @@ export default function Dashboard() {
                 onTaskSelect={handleTaskSelect}
               />
               <div className="absolute top-6 right-6 z-[1000] flex flex-col gap-3">
-                {selectedTaskId && userLocation && (
-                   <div className="glass px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-8 ring-2 ring-primary">
-                     <div className="flex flex-col">
-                       <span className="text-[10px] uppercase font-black text-primary tracking-widest mb-0.5">Tactical Path Locked</span>
-                       <span className="text-sm font-black truncate max-w-[200px]">
-                         {activeTasksForMap.find(t => t.id === selectedTaskId)?.title}
-                       </span>
-                     </div>
-                     <Button 
-                       size="icon" 
-                       variant="ghost" 
-                       className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive rounded-full" 
-                       onClick={() => setSelectedTaskId(null)}
-                     >
-                       <X className="h-4 w-4" />
-                     </Button>
-                   </div>
-                )}
                 <div className="glass p-5 rounded-2xl shadow-2xl space-y-3 min-w-[200px]">
                   <h4 className="text-[10px] font-black uppercase text-muted-foreground mb-4 tracking-[0.15em]">Grid Legend</h4>
                   <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full bg-destructive border-2 border-white shadow-sm" /> High Priority Risk
+                    <div className="w-3.5 h-3.5 rounded-full bg-destructive border-2 border-white shadow-sm" /> High Priority
                   </div>
                   <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm" /> Medium Priority Risk
+                    <div className="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-sm" /> Medium Priority
                   </div>
                   <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" /> Standard Risk
+                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white shadow-sm" /> Standard
                   </div>
                   <div className="flex items-center gap-3 text-xs font-bold">
-                    <div className="w-3.5 h-3.5 rounded-full bg-primary border-2 border-white shadow-sm" /> Active Responder
+                    <div className="w-3.5 h-3.5 rounded-full bg-primary border-2 border-white shadow-sm" /> Responder
                   </div>
                 </div>
               </div>
@@ -423,173 +425,225 @@ export default function Dashboard() {
               </div>
             </Card>
 
-             <Tabs defaultValue="matches" className="space-y-8">
-               <div className="flex justify-between items-center bg-card p-2 rounded-2xl border-2 shadow-sm">
-                 <TabsList className="grid w-full grid-cols-3 max-w-lg h-12 bg-muted/50 p-1 rounded-xl">
-                   <TabsTrigger value="matches" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Deployment Matches</TabsTrigger>
-                   <TabsTrigger value="tasks" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Intelligence Feed</TabsTrigger>
-                   <TabsTrigger value="volunteers" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Personnel Registry</TabsTrigger>
+             {simulationRole === 'ngo' ? (
+               <Tabs defaultValue="matches" className="space-y-8">
+                 <TabsList className="grid w-full grid-cols-3 max-w-lg h-12 bg-muted p-1 rounded-xl">
+                   <TabsTrigger value="matches" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Smart Matches</TabsTrigger>
+                   <TabsTrigger value="missions" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Active Missions</TabsTrigger>
+                   <TabsTrigger value="personnel" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Vetted Personnel</TabsTrigger>
                  </TabsList>
-               </div>
 
-               <TabsContent value="matches" className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {matches.length > 0 ? (
-                     matches.filter(m => locationFilter === 'all' || m.location === locationFilter).slice(0, 9).map((match, i) => (
-                       <Card key={`${match.taskId}-${match.volunteerId}`} className="border-2 shadow-lg hover:shadow-2xl transition-all duration-300 bg-card group flex flex-col relative overflow-hidden rounded-3xl">
-                         <div className="absolute top-0 right-0 p-5">
-                           <div className="bg-primary/10 text-primary text-[10px] font-black uppercase px-4 py-1.5 rounded-full flex items-center gap-2 border-2 border-primary/20 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                             <LocateFixed className="h-4 w-4" /> {match.distance}km
-                           </div>
-                         </div>
+                 <TabsContent value="matches" className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                     {matches.length > 0 ? (
+                       matches.slice(0, 9).map((match) => (
+                         <Card key={`${match.taskId}-${match.volunteerId}`} className="border-2 shadow-lg hover:shadow-2xl transition-all duration-300 bg-card group rounded-3xl overflow-hidden flex flex-col">
+                           <CardHeader className="pb-4">
+                             <div className="flex justify-between items-start">
+                               <div className="space-y-1">
+                                 <CardTitle className="text-xl font-black text-foreground">Strategic Match</CardTitle>
+                                 <CardDescription className="text-[10px] font-black uppercase text-primary">Distance Score: {match.score}</CardDescription>
+                               </div>
+                               <Badge className="bg-primary/10 text-primary border-2 border-primary/20">{match.distance}km</Badge>
+                             </div>
+                           </CardHeader>
+                           <CardContent className="space-y-4 flex-grow">
+                             <div className="p-4 bg-muted/50 rounded-2xl border-l-4 border-destructive space-y-1">
+                               <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Incident</p>
+                               <p className="font-extrabold text-foreground text-sm leading-snug">{match.taskTitle}</p>
+                             </div>
+                             <div className="p-4 bg-primary/5 rounded-2xl border-l-4 border-primary space-y-1">
+                               <p className="text-[10px] font-black text-primary uppercase tracking-widest">Nearest Qualified</p>
+                               <p className="font-extrabold text-foreground text-sm">{match.volunteerName}</p>
+                             </div>
+                           </CardContent>
+                           <CardFooter className="pt-4 border-t bg-muted/20">
+                              <Button className="w-full h-12 gap-2 font-black uppercase text-[11px] tracking-widest rounded-xl" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
+                                <UserCheck className="h-5 w-5" /> Deploy Responder
+                              </Button>
+                           </CardFooter>
+                         </Card>
+                       ))
+                     ) : (
+                       <div className="col-span-full py-24 text-center bg-card rounded-[3rem] border-2 border-dashed">
+                         <Zap className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6" />
+                         <h3 className="text-2xl font-black text-muted-foreground uppercase tracking-tighter">No Matches Detected</h3>
+                         <p className="text-sm text-muted-foreground mt-3 font-semibold max-w-sm mx-auto">Sync data to identify new opportunities.</p>
+                       </div>
+                     )}
+                   </div>
+                 </TabsContent>
+
+                 <TabsContent value="missions" className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                     {filteredTasks.map(task => (
+                       <Card key={task.id} className={cn("border-2 shadow-md bg-card rounded-3xl overflow-hidden", task.status === 'completed' && "opacity-50")}>
                          <CardHeader className="pb-4">
-                           <CardTitle className="text-xl font-black text-foreground">Strategic Allocation</CardTitle>
-                           <CardDescription className="text-[10px] font-black uppercase text-primary">Proximity Score: {match.score}</CardDescription>
+                           <div className="flex justify-between items-start mb-3">
+                             <Badge className={cn("text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-xl", 
+                               task.urgency === 'high' ? "bg-destructive text-destructive-foreground" : "bg-primary text-white")}>
+                               {task.urgency}
+                             </Badge>
+                             <div className="flex items-center gap-2 text-muted-foreground text-xs font-black uppercase tracking-wider">
+                               <MapPin className="h-4 w-4 text-primary" /> {task.location}
+                             </div>
+                           </div>
+                           <CardTitle className="text-xl font-black truncate">{task.title}</CardTitle>
                          </CardHeader>
-                         <CardContent className="space-y-5 flex-grow">
-                           <div className="p-4 bg-muted/50 rounded-2xl border-l-4 border-destructive space-y-1">
-                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Incident Sector: {match.location}</p>
-                             <p className="font-extrabold text-foreground text-sm leading-snug">{match.taskTitle}</p>
+                         <CardContent className="space-y-4 pt-0">
+                           <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed font-medium">{task.description}</p>
+                           {task.assignedTo && (
+                             <div className="flex items-center gap-2 pt-3 border-t">
+                               <Badge variant="outline" className="text-emerald-600 border-emerald-500/20 bg-emerald-50 text-[10px] font-black uppercase px-3 py-1">Assigned to: {task.assignedTo}</Badge>
+                             </div>
+                           )}
+                         </CardContent>
+                         <CardFooter className="pt-4 border-t flex gap-3 bg-muted/20">
+                           {task.status !== 'completed' && (
+                             <Button variant="ghost" size="sm" className="flex-1 text-[11px] font-black uppercase tracking-widest h-11 rounded-xl" onClick={() => handleMarkAsCompleted(task.id)}>
+                               <CheckCircle className="h-4 w-4 mr-2" /> Complete
+                             </Button>
+                           )}
+                           <Button variant="outline" size="sm" className="flex-1 text-[11px] font-black uppercase tracking-widest h-11 rounded-xl" onClick={() => handleTaskSelect(task.id)}>
+                             <MapIcon className="h-4 w-4 mr-2" /> Track
+                           </Button>
+                         </CardFooter>
+                       </Card>
+                     ))}
+                   </div>
+                 </TabsContent>
+                 
+                 <TabsContent value="personnel" className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                     {sortedVolunteers.map(volunteer => (
+                       <Card key={volunteer.id} className="border-2 shadow-md bg-card rounded-3xl hover:shadow-xl transition-all group overflow-hidden">
+                         <div className="h-2 bg-primary" />
+                         <CardHeader className="pb-4">
+                           <div className="flex items-center gap-2 text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-3">
+                             <MapPin className="h-4 w-4 text-primary" /> Sector {volunteer.location}
                            </div>
-                           <div className="p-4 bg-primary/5 rounded-2xl border-l-4 border-primary space-y-1">
-                             <p className="text-[10px] font-black text-primary uppercase tracking-widest">Closest Responder</p>
-                             <p className="font-extrabold text-foreground text-sm">{match.volunteerName}</p>
-                           </div>
+                           <CardTitle className="text-xl font-black flex items-center justify-between">
+                             {volunteer.name}
+                             <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-1 border-2">Verified</Badge>
+                           </CardTitle>
+                         </CardHeader>
+                         <CardContent className="space-y-5 pt-0">
                            <div className="flex flex-wrap gap-2">
-                             {match.reasons.map((r, idx) => (
-                               <Badge key={idx} variant="secondary" className="text-[9px] font-black uppercase tracking-tight py-1 px-2.5 rounded-lg border-2">{r}</Badge>
+                             {volunteer.skills.map((skill, idx) => (
+                               <Badge key={idx} variant="secondary" className="text-[10px] font-bold py-1 px-3 rounded-lg bg-muted border-2">{skill}</Badge>
                              ))}
                            </div>
                          </CardContent>
-                         <CardFooter className="pt-4 border-t bg-muted/20">
-                            <Button className="w-full h-12 gap-2 font-black uppercase text-[11px] tracking-widest rounded-xl shadow-lg" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
-                              <UserCheck className="h-5 w-5" /> Execute Deployment
-                            </Button>
+                         <CardFooter className="pt-4 bg-muted/20">
+                           <Button variant="outline" size="sm" className="w-full text-[11px] font-black uppercase tracking-widest h-12 rounded-xl border-2 hover:bg-primary hover:text-white transition-all" onClick={() => { setMapCenter([volunteer.latitude, volunteer.longitude]); setMapZoom(16); }}>
+                             <MapIcon className="h-4 w-4 mr-2" /> Locate Personnel
+                           </Button>
                          </CardFooter>
                        </Card>
-                     ))
+                     ))}
+                   </div>
+                 </TabsContent>
+               </Tabs>
+             ) : (
+               <Tabs defaultValue="nearby" className="space-y-8">
+                 <TabsList className="grid w-full grid-cols-2 max-w-sm h-12 bg-muted p-1 rounded-xl">
+                   <TabsTrigger value="nearby" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Nearby Relief</TabsTrigger>
+                   <TabsTrigger value="assignments" className="rounded-lg font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">My Missions</TabsTrigger>
+                 </TabsList>
+
+                 <TabsContent value="nearby" className="space-y-6">
+                   {!userLocation ? (
+                     <div className="py-24 text-center bg-card rounded-[3rem] border-2 border-dashed">
+                       <Navigation className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6" />
+                       <h3 className="text-2xl font-black text-muted-foreground uppercase tracking-tighter">Position Not Verified</h3>
+                       <p className="text-sm text-muted-foreground mt-3 font-semibold max-w-sm mx-auto">Verify your coordinates to see humanitarian needs in your immediate sector.</p>
+                       <Button onClick={handleLocateMe} className="mt-8 rounded-xl font-black uppercase tracking-widest px-8">Sync Location</Button>
+                     </div>
                    ) : (
-                     <div className="col-span-full py-24 text-center bg-card rounded-[3rem] border-2 border-dashed">
-                       <Zap className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6" />
-                       <h3 className="text-2xl font-black text-muted-foreground uppercase tracking-tighter">No High-Confidence Matches Detected</h3>
-                       <p className="text-sm text-muted-foreground mt-3 font-semibold max-w-sm mx-auto">Import global intel or refresh the grid to identify new responder opportunities.</p>
+                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                       {nearbyOpportunities.map(task => (
+                         <Card key={task.id} className="border-2 shadow-lg bg-card rounded-3xl overflow-hidden flex flex-col hover:shadow-2xl transition-all">
+                           <div className="p-3 bg-primary/5 border-b flex justify-between items-center px-6">
+                              <span className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                                <LocateFixed className="h-4 w-4" /> {task.distance.toFixed(1)}km Away
+                              </span>
+                              <Badge variant="outline" className="text-[9px] font-black uppercase border-2">{task.urgency}</Badge>
+                           </div>
+                           <CardHeader className="pb-4">
+                             <CardTitle className="text-xl font-black text-foreground">{task.title}</CardTitle>
+                             <CardDescription className="font-bold text-muted-foreground">{task.location}</CardDescription>
+                           </CardHeader>
+                           <CardContent className="space-y-4 flex-grow">
+                             <p className="text-sm text-muted-foreground leading-relaxed italic line-clamp-2">"{task.description}"</p>
+                             <div className="flex flex-wrap gap-2">
+                               {task.skillsRequired.map((s, i) => (
+                                 <Badge key={i} variant="secondary" className="text-[9px] font-bold px-2 rounded-lg">{s}</Badge>
+                               ))}
+                             </div>
+                           </CardContent>
+                           <CardFooter className="pt-4 border-t bg-muted/10 p-4">
+                             <Button className="w-full h-11 gap-2 font-black uppercase text-[10px] tracking-widest rounded-xl" onClick={() => handleTaskSelect(task.id)}>
+                               <Route className="h-4 w-4" /> Secure Path
+                             </Button>
+                           </CardFooter>
+                         </Card>
+                       ))}
                      </div>
                    )}
-                 </div>
-               </TabsContent>
+                 </TabsContent>
 
-               <TabsContent value="tasks" className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {filteredTasks.map(task => (
-                     <Card 
-                       key={task.id} 
-                       className={cn(
-                         "border-2 shadow-md bg-card relative transition-all hover:shadow-xl rounded-3xl group", 
-                         task.status === 'completed' && "opacity-50 grayscale",
-                         selectedTaskId === task.id && "ring-4 ring-primary ring-offset-4"
-                       )}
-                     >
-                       <CardHeader className="pb-4">
-                         <div className="flex justify-between items-start mb-3">
-                           <Badge className={cn("text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-xl", 
-                             task.urgency === 'high' ? "bg-destructive text-destructive-foreground" : 
-                             task.urgency === 'medium' ? "bg-amber-500 text-white" : "bg-emerald-500 text-white")}>
-                             {task.urgency} Priority
-                           </Badge>
-                           <div className="flex items-center gap-2 text-muted-foreground text-xs font-black uppercase tracking-wider">
-                             <MapPin className="h-4 w-4 text-primary" /> {task.location}
-                           </div>
-                         </div>
-                         <CardTitle className="text-xl font-black truncate leading-tight">{task.title}</CardTitle>
-                       </CardHeader>
-                       <CardContent className="space-y-4 pt-0">
-                         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed font-medium">{task.description}</p>
-                       </CardContent>
-                       <CardFooter className="pt-4 border-t flex gap-3">
-                         {task.status === 'open' && (
-                           <Button variant="ghost" size="sm" className="flex-1 text-[11px] font-black uppercase tracking-widest h-11 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-colors" onClick={() => handleMarkAsCompleted(task.id)}>
-                             <CheckCircle className="h-4 w-4 mr-2" /> Fulfil
-                           </Button>
-                         )}
-                         <Button 
-                           variant={selectedTaskId === task.id ? "default" : "outline"} 
-                           size="sm" 
-                           className="flex-1 text-[11px] font-black uppercase tracking-widest h-11 rounded-xl shadow-sm border-2" 
-                           onClick={() => handleTaskSelect(task.id)}
-                         >
-                           <Route className="h-4 w-4 mr-2" /> Tactical Path
-                         </Button>
-                       </CardFooter>
-                     </Card>
-                   ))}
-                 </div>
-               </TabsContent>
-               
-               <TabsContent value="volunteers" className="space-y-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {sortedVolunteers.filter(v => locationFilter === 'all' || v.location === locationFilter).map(volunteer => (
-                     <Card key={volunteer.id} className="border-2 shadow-md bg-card rounded-3xl hover:shadow-xl transition-all group overflow-hidden">
-                       <div className="h-2 bg-primary" />
-                       <CardHeader className="pb-4">
-                         <div className="flex items-center gap-2 text-muted-foreground text-[10px] font-black uppercase tracking-widest mb-3">
-                           <MapPin className="h-4 w-4 text-primary" /> Sector {volunteer.location}
-                         </div>
-                         <CardTitle className="text-xl font-black flex items-center justify-between">
-                           {volunteer.name}
-                           <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest py-1 border-2">Verified</Badge>
-                         </CardTitle>
-                       </CardHeader>
-                       <CardContent className="space-y-5 pt-0">
-                         <div className="flex flex-wrap gap-2">
-                           {volunteer.skills.map((skill, idx) => (
-                             <Badge key={idx} variant="secondary" className="text-[10px] font-bold py-1 px-3 rounded-lg bg-muted border-2">{skill}</Badge>
-                           ))}
-                         </div>
-                         <div className="pt-4 border-t bg-muted/10 p-4 rounded-2xl flex items-center justify-between">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                               <Zap className="h-4 w-4 text-amber-500" />
-                               Proximity Risks
-                            </p>
-                            <span className="text-lg font-black">{activeTasksForMap.filter(t => t.location === volunteer.location).length}</span>
-                         </div>
-                       </CardContent>
-                       <CardFooter className="pt-4 bg-muted/20">
-                         <Button variant="outline" size="sm" className="w-full text-[11px] font-black uppercase tracking-widest h-12 rounded-xl border-2 hover:bg-primary hover:text-white transition-all" onClick={() => { setMapCenter([volunteer.latitude, volunteer.longitude]); setMapZoom(16); }}>
-                           <MapIcon className="h-4 w-4 mr-2" /> Locate Personnel
-                         </Button>
-                       </CardFooter>
-                     </Card>
-                   ))}
-                 </div>
-               </TabsContent>
-             </Tabs>
+                 <TabsContent value="assignments" className="space-y-6">
+                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                     {myAssignments.length > 0 ? (
+                       myAssignments.map(task => (
+                         <Card key={task.id} className="border-2 shadow-xl border-emerald-500/20 bg-emerald-500/[0.02] rounded-3xl overflow-hidden flex flex-col">
+                           <CardHeader className="pb-4">
+                             <div className="flex justify-between items-start mb-2">
+                               <Badge className="bg-emerald-500 text-white font-black uppercase text-[9px]">In Progress</Badge>
+                               <span className="text-[10px] font-bold text-muted-foreground uppercase">{task.location}</span>
+                             </div>
+                             <CardTitle className="text-xl font-black text-foreground">{task.title}</CardTitle>
+                           </CardHeader>
+                           <CardContent className="flex-grow">
+                             <p className="text-sm text-muted-foreground italic">Your tactical assignment for this mission is active. Report status updates to HQ.</p>
+                           </CardContent>
+                           <CardFooter className="pt-4 border-t bg-emerald-500/5 p-4 flex gap-2">
+                             <Button variant="default" className="flex-1 bg-emerald-600 hover:bg-emerald-700 h-11 rounded-xl text-[10px] font-black uppercase" onClick={() => handleMarkAsCompleted(task.id)}>
+                               <CheckCircle2 className="h-4 w-4 mr-2" /> Mission Complete
+                             </Button>
+                             <Button variant="outline" className="flex-1 border-emerald-500/30 text-emerald-700 h-11 rounded-xl text-[10px] font-black uppercase" onClick={() => handleTaskSelect(task.id)}>
+                               <MapIcon className="h-4 w-4 mr-2" /> Navigate
+                             </Button>
+                           </CardFooter>
+                         </Card>
+                       ))
+                     ) : (
+                       <div className="py-24 text-center bg-card rounded-[3rem] border-2 border-dashed">
+                         <ClipboardList className="h-16 w-16 text-muted-foreground/20 mx-auto mb-6" />
+                         <h3 className="text-2xl font-black text-muted-foreground uppercase tracking-tighter">No Active Assignments</h3>
+                         <p className="text-sm text-muted-foreground mt-3 font-semibold max-w-sm mx-auto">Explore nearby relief opportunities or wait for HQ tactical deployment.</p>
+                       </div>
+                     )}
+                   </div>
+                 </TabsContent>
+               </Tabs>
+             )}
           </div>
 
           <aside className="lg:col-span-3 space-y-8">
             <Card className="shadow-2xl border-2 bg-primary/[0.02] rounded-[2rem] overflow-hidden">
               <CardHeader className="pb-4 bg-primary/5 border-b-2">
                 <CardTitle className="text-xs font-black flex items-center gap-3 uppercase tracking-[0.2em] text-primary">
-                  <BarChart3 className="h-5 w-5" /> Risk Analytics
+                  <BarChart3 className="h-5 w-5" /> Operational Data
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-8 space-y-8">
                 <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                  <BarChart 
-                    data={areaImpact} 
-                    layout="vertical" 
-                    margin={{ left: -10 }}
-                  >
+                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -10 }}>
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[10px] font-black uppercase text-muted-foreground" />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Bar 
-                      dataKey="tasks" 
-                      radius={[0, 8, 8, 0]}
-                      className="cursor-pointer"
-                      onClick={(data) => {
-                        if (data && data.name) handleRegionClick(data.name);
-                      }}
-                    >
+                    <Bar dataKey="tasks" radius={[0, 8, 8, 0]}>
                       {areaImpact.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.3)"} />
                       ))}
@@ -598,22 +652,11 @@ export default function Dashboard() {
                 </ChartContainer>
                 
                 <div className="space-y-3">
-                  <Button 
-                    variant={locationFilter === 'all' ? 'default' : 'outline'} 
-                    size="sm" 
-                    className="w-full justify-start text-[11px] h-12 font-black uppercase tracking-widest rounded-xl border-2" 
-                    onClick={() => handleRegionClick('all')}
-                  >
+                  <Button variant={locationFilter === 'all' ? 'default' : 'outline'} size="sm" className="w-full justify-start text-[11px] h-12 font-black uppercase tracking-widest rounded-xl border-2" onClick={() => handleRegionClick('all')}>
                     <Activity className="h-4 w-4 mr-3" /> Full Grid View
                   </Button>
                   {areaImpact.map((area) => (
-                    <Button 
-                      key={area.name} 
-                      variant={locationFilter === area.name ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className="w-full justify-between text-[11px] h-12 font-black uppercase tracking-widest rounded-xl border-2 group transition-all" 
-                      onClick={() => handleRegionClick(area.name)}
-                    >
+                    <Button key={area.name} variant={locationFilter === area.name ? 'secondary' : 'ghost'} size="sm" className="w-full justify-between text-[11px] h-12 font-black uppercase tracking-widest rounded-xl border-2 group transition-all" onClick={() => handleRegionClick(area.name)}>
                       <span className="flex items-center"><MapPin className="h-4 w-4 mr-3 text-primary group-hover:scale-110 transition-transform" /> {area.name}</span>
                       <Badge variant="outline" className="text-[10px] h-6 px-2.5 font-black bg-white/50 border-2">{area.tasks}</Badge>
                     </Button>
@@ -631,8 +674,11 @@ export default function Dashboard() {
                </CardHeader>
                <CardContent className="space-y-5 pt-8 p-6">
                   <div className="p-5 bg-card rounded-2xl border-l-8 border-emerald-500 shadow-sm text-[12px] font-bold leading-relaxed">
-                    Distance-based matching is active. Closest responders are prioritized for mission assignment.
+                    Distance-based matching is active. Closest responders are prioritized.
                     <span className="block mt-2 text-emerald-600 font-black tracking-widest uppercase text-[10px]">Strategic Sync Active.</span>
+                  </div>
+                  <div className="p-5 bg-card rounded-2xl border-l-8 border-primary shadow-sm text-[12px] font-bold leading-relaxed">
+                    Role Simulation: <span className="text-primary font-black uppercase">{simulationRole} Perspective</span> enabled.
                   </div>
                </CardContent>
             </Card>
@@ -642,3 +688,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
