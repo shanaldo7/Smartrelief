@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardList, Sparkles, AlertCircle, MapPin, Navigation } from "lucide-react";
+import { ClipboardList, Sparkles, MapPin, Navigation, Mail } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,7 @@ export default function NewTask() {
   const db = useFirestore();
   const { user } = useUser();
   const [title, setTitle] = useState("");
+  const [email, setEmail] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Food");
   const [location, setLocation] = useState("");
@@ -89,6 +90,7 @@ export default function NewTask() {
       setDocumentNonBlocking(taskRef, {
         id: taskRef.id,
         title,
+        contactEmail: email,
         description,
         category,
         location,
@@ -104,7 +106,6 @@ export default function NewTask() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      // Log activity
       const actRef = doc(collection(db, "activities"));
       setDocumentNonBlocking(actRef, {
         id: actRef.id,
@@ -124,26 +125,35 @@ export default function NewTask() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="container mx-auto px-4 py-12 max-w-2xl">
-        <Card className="shadow-xl border-none rounded-3xl overflow-hidden">
-          <CardHeader className="bg-primary/5 pb-8">
+        <Card className="shadow-2xl border-none rounded-3xl overflow-hidden bg-card">
+          <CardHeader className="bg-primary/5 pb-8 border-b">
             <div className="flex items-center gap-2 text-primary mb-2">
               <ClipboardList className="h-6 w-6" />
-              <span className="font-bold uppercase tracking-widest text-xs">Tactical Request</span>
+              <span className="font-bold uppercase tracking-widest text-xs">Tactical NGO Request</span>
             </div>
-            <CardTitle className="text-3xl font-extrabold font-headline">New Relief Mission</CardTitle>
-            <CardDescription>Specify the incident details to mobilize nearby rescuers.</CardDescription>
+            <CardTitle className="text-3xl font-black font-headline uppercase">New Relief Mission</CardTitle>
+            <CardDescription className="font-medium italic">Provide organization details to mobilize nearby rescuers.</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6 pt-8">
-              <div className="space-y-2">
-                <Label htmlFor="title" className="font-bold text-xs uppercase text-muted-foreground">Mission Title</Label>
-                <Input id="title" placeholder="e.g. Emergency Medical Supplies" className="rounded-xl h-12" value={title} onChange={e => setTitle(e.target.value)} required />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Mission Title</Label>
+                  <Input id="title" placeholder="e.g. Emergency Medical Supplies" className="rounded-xl h-12 border-2" value={title} onChange={e => setTitle(e.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">NGO Contact Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+                    <Input id="email" type="email" placeholder="org@humanitarian.org" className="rounded-xl h-12 border-2 pl-10" value={email} onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category" className="font-bold text-xs uppercase text-muted-foreground">Aid Sector</Label>
+                <Label htmlFor="category" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Aid Sector</Label>
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="rounded-xl h-12"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue placeholder="Category" /></SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -154,23 +164,23 @@ export default function NewTask() {
               
               <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <Label htmlFor="description" className="font-bold text-xs uppercase text-muted-foreground">Tactical Briefing</Label>
-                  <Button type="button" variant="ghost" size="sm" className="text-[10px] font-bold uppercase text-primary h-7" onClick={handleEnhance} disabled={isEnhancing}>
+                  <Label htmlFor="description" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Tactical Briefing</Label>
+                  <Button type="button" variant="ghost" size="sm" className="text-[10px] font-bold uppercase text-primary h-7 px-3 bg-primary/5 rounded-lg" onClick={handleEnhance} disabled={isEnhancing}>
                     <Sparkles className="h-3 w-3 mr-1" /> {isEnhancing ? "Optimizing..." : "AI Enhance"}
                   </Button>
                 </div>
-                <Textarea id="description" placeholder="Describe the crisis and help required..." className="min-h-[120px] rounded-xl" value={description} onChange={e => setDescription(e.target.value)} required />
+                <Textarea id="description" placeholder="Describe the crisis and help required..." className="min-h-[120px] rounded-xl border-2" value={description} onChange={e => setDescription(e.target.value)} required />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="font-bold text-xs uppercase text-muted-foreground">City / Region</Label>
-                  <Input id="location" placeholder="e.g. Mumbai" className="rounded-xl h-12" value={location} onChange={e => setLocation(e.target.value)} required />
+                  <Label htmlFor="location" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">City / Region</Label>
+                  <Input id="location" placeholder="e.g. Mumbai" className="rounded-xl h-12 border-2" value={location} onChange={e => setLocation(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="urgency" className="font-bold text-xs uppercase text-muted-foreground">Priority Level</Label>
+                  <Label htmlFor="urgency" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Priority Level</Label>
                   <Select value={urgency} onValueChange={setUrgency}>
-                    <SelectTrigger className="rounded-xl h-12"><SelectValue placeholder="Urgency" /></SelectTrigger>
+                    <SelectTrigger className="rounded-xl h-12 border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low Impact</SelectItem>
                       <SelectItem value="medium">Medium Priority</SelectItem>
@@ -182,21 +192,21 @@ export default function NewTask() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <Label htmlFor="coords" className="font-bold text-xs uppercase text-muted-foreground">GPS Coordinates (Lat, Lng)</Label>
-                  <Button type="button" variant="outline" size="sm" className="text-[10px] font-bold uppercase h-7 rounded-lg" onClick={handleDetectLocation} disabled={isLocating}>
+                  <Label htmlFor="coords" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">GPS Coordinates (Lat, Lng)</Label>
+                  <Button type="button" variant="outline" size="sm" className="text-[10px] font-bold uppercase h-7 rounded-lg border-2" onClick={handleDetectLocation} disabled={isLocating}>
                     <Navigation className="h-3 w-3 mr-1" /> Detect
                   </Button>
                 </div>
-                <Input id="coords" placeholder="e.g. 19.0760, 72.8777" className="rounded-xl h-12 font-mono text-xs" value={coords} onChange={e => setCoords(e.target.value)} required />
+                <Input id="coords" placeholder="e.g. 19.0760, 72.8777" className="rounded-xl h-12 font-mono text-xs border-2" value={coords} onChange={e => setCoords(e.target.value)} required />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="skills" className="font-bold text-xs uppercase text-muted-foreground">Required Expertise (Comma Separated)</Label>
-                <Input id="skills" placeholder="e.g. Healthcare, Logistics, Driving" className="rounded-xl h-12" value={skillsRequired} onChange={e => setSkillsRequired(e.target.value)} required />
+                <Label htmlFor="skills" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Required Expertise (Comma Separated)</Label>
+                <Input id="skills" placeholder="e.g. Healthcare, Logistics, Driving" className="rounded-xl h-12 border-2" value={skillsRequired} onChange={e => setSkillsRequired(e.target.value)} required />
               </div>
             </CardContent>
-            <CardFooter className="pb-8">
-              <Button type="submit" className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg" disabled={loading}>
+            <CardFooter className="pb-12 pt-4">
+              <Button type="submit" className="w-full h-14 text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl hover:shadow-2xl transition-all" disabled={loading}>
                 {loading ? "Mobilizing..." : "Publish to Relief Map"}
               </Button>
             </CardFooter>

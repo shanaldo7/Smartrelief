@@ -1,18 +1,19 @@
 
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserPlus, MapPin, Navigation, ShieldCheck } from "lucide-react";
+import { ShieldCheck, MapPin, Navigation, Mail, User } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const SKILLS = [
   "General Labor", "Healthcare", "Tech Support", "Cooking", "Driving", "Admin", "Logistics"
@@ -22,6 +23,7 @@ export default function NewVolunteer() {
   const db = useFirestore();
   const { user } = useUser();
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [location, setLocation] = useState("");
   const [coords, setCoords] = useState("19.0760, 72.8777");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -29,6 +31,15 @@ export default function NewVolunteer() {
   const [isLocating, setIsLocating] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+    if (user?.displayName) {
+      setName(user.displayName);
+    }
+  }, [user]);
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
@@ -68,7 +79,7 @@ export default function NewVolunteer() {
       return;
     }
 
-    if (!name || !location || selectedSkills.length === 0) {
+    if (!name || !email || !location || selectedSkills.length === 0) {
       toast({ variant: "destructive", title: "Missing Details", description: "Please complete all profile sections." });
       return;
     }
@@ -79,7 +90,7 @@ export default function NewVolunteer() {
       setDocumentNonBlocking(profileRef, {
         id: user.uid,
         name,
-        email: user.email || "",
+        email: email,
         location,
         latitude: lat,
         longitude: lng,
@@ -99,46 +110,58 @@ export default function NewVolunteer() {
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="container mx-auto px-4 py-12 max-w-2xl">
-        <Card className="shadow-2xl border-none rounded-3xl overflow-hidden">
-          <CardHeader className="bg-primary/5 pb-8">
+        <Card className="shadow-2xl border-none rounded-3xl overflow-hidden bg-card">
+          <CardHeader className="bg-primary/5 pb-8 border-b">
             <div className="flex items-center gap-2 text-primary mb-2">
               <ShieldCheck className="h-6 w-6" />
               <span className="font-bold uppercase tracking-widest text-xs">Responder Enrollment</span>
             </div>
-            <CardTitle className="text-3xl font-extrabold font-headline">Volunteer as a Rescuer</CardTitle>
-            <CardDescription>Join the grid to receive real-time alerts for local humanitarian needs.</CardDescription>
+            <CardTitle className="text-3xl font-black font-headline uppercase">Volunteer as a Rescuer</CardTitle>
+            <CardDescription className="font-medium italic">Join the grid to receive real-time alerts for local humanitarian needs.</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-8 pt-8">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="font-bold text-xs uppercase text-muted-foreground">Full Legal Name</Label>
-                <Input id="name" placeholder="How should NGOs address you?" className="rounded-xl h-12" value={name} onChange={e => setName(e.target.value)} required />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Full Name</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+                    <Input id="name" placeholder="Legal Name" className="rounded-xl h-12 border-2 pl-10" value={name} onChange={e => setName(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Contact Gmail</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+                    <Input id="email" type="email" placeholder="email@gmail.com" className="rounded-xl h-12 border-2 pl-10" value={email} onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="font-bold text-xs uppercase text-muted-foreground">Base Operations City</Label>
-                  <Input id="location" placeholder="e.g. Delhi" className="rounded-xl h-12" value={location} onChange={e => setLocation(e.target.value)} required />
+                  <Label htmlFor="location" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Base Operations City</Label>
+                  <Input id="location" placeholder="e.g. Delhi" className="rounded-xl h-12 border-2" value={location} onChange={e => setLocation(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-end">
-                    <Label htmlFor="coords" className="font-bold text-xs uppercase text-muted-foreground">GPS Location</Label>
-                    <Button type="button" variant="link" size="sm" className="text-[10px] font-bold uppercase h-6 p-0" onClick={handleDetectLocation} disabled={isLocating}>
+                    <Label htmlFor="coords" className="font-bold text-[10px] uppercase text-muted-foreground ml-1">GPS Location</Label>
+                    <Button type="button" variant="link" size="sm" className="text-[10px] font-bold uppercase h-6 p-0 text-primary" onClick={handleDetectLocation} disabled={isLocating}>
                       <Navigation className="h-3 w-3 mr-1" /> Use GPS
                     </Button>
                   </div>
-                  <Input id="coords" placeholder="lat, lng" className="rounded-xl h-12 font-mono text-xs" value={coords} onChange={e => setCoords(e.target.value)} required />
+                  <Input id="coords" placeholder="lat, lng" className="rounded-xl h-12 font-mono text-xs border-2" value={coords} onChange={e => setCoords(e.target.value)} required />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <Label className="font-bold text-xs uppercase text-muted-foreground">Combat / Support Expertise</Label>
+                <Label className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Support Expertise</Label>
                 <div className="grid grid-cols-2 gap-3">
                   {SKILLS.map(skill => (
                     <div 
                       key={skill} 
                       className={cn(
-                        "flex items-center space-x-3 border rounded-2xl p-4 transition-all cursor-pointer hover:border-primary/50",
+                        "flex items-center space-x-3 border-2 rounded-2xl p-4 transition-all cursor-pointer hover:border-primary/50",
                         selectedSkills.includes(skill) ? "bg-primary/5 border-primary shadow-sm" : "bg-card"
                       )}
                       onClick={() => handleSkillToggle(skill)}
@@ -147,16 +170,16 @@ export default function NewVolunteer() {
                         id={`skill-${skill}`} 
                         checked={selectedSkills.includes(skill)} 
                         onCheckedChange={() => handleSkillToggle(skill)} 
-                        className="rounded-full h-5 w-5"
+                        className="rounded-full h-5 w-5 border-2"
                       />
-                      <Label htmlFor={`skill-${skill}`} className="flex-grow cursor-pointer font-semibold text-sm">{skill}</Label>
+                      <Label htmlFor={`skill-${skill}`} className="flex-grow cursor-pointer font-bold text-xs uppercase tracking-tight">{skill}</Label>
                     </div>
                   ))}
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="pb-8 pt-4">
-              <Button type="submit" className="w-full h-14 text-lg font-bold rounded-2xl shadow-xl" disabled={loading}>
+            <CardFooter className="pb-12 pt-4">
+              <Button type="submit" className="w-full h-14 text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl hover:shadow-2xl transition-all" disabled={loading}>
                 {loading ? "Activating..." : "Broadcast Availability"}
               </Button>
             </CardFooter>
@@ -165,8 +188,4 @@ export default function NewVolunteer() {
       </main>
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ");
 }

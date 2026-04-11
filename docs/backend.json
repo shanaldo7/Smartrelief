@@ -123,6 +123,11 @@
           "type": "string",
           "description": "The name of the organization or individual who submitted the task."
         },
+        "contactEmail": {
+          "type": "string",
+          "description": "The contact email for the organization or NGO.",
+          "format": "email"
+        },
         "assignedTo": {
           "type": "string",
           "description": "The name of the volunteer assigned to this task."
@@ -150,6 +155,7 @@
         "priority",
         "status",
         "submittedBy",
+        "contactEmail",
         "createdAt"
       ]
     },
