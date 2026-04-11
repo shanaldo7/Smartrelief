@@ -62,10 +62,9 @@ interface Match {
 }
 
 const SAMPLE_NGO_DATA = [
-  { title: "Food Distribution", description: "Providing meals to families in need.", skillsRequired: ["General Labor", "Logistics"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "Food Relief NGO" },
-  { title: "Medical Support", description: "Assisting at a local health clinic.", skillsRequired: ["Healthcare"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "medium", priority: 2, status: "open", submittedBy: "Medical Corps" },
-  { title: "Remote Teaching", description: "Educational support for local children.", skillsRequired: ["Admin", "Tech Support"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "low", priority: 1, status: "open", submittedBy: "EduHelp" },
-  { title: "Emergency Logistics", description: "Coordinating resource arrival at regional hubs.", skillsRequired: ["Logistics", "Admin"], location: "Bangalore", latitude: 12.9716, longitude: 77.5946, urgency: "high", priority: 3, status: "open", submittedBy: "Logistics First" },
+  { title: "Food Relief", description: "Food distribution for families.", skillsRequired: ["Logistics"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "NGO Partner" },
+  { title: "Medical Support", description: "Healthcare assistance.", skillsRequired: ["Healthcare"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "medium", priority: 2, status: "open", submittedBy: "NGO Partner" },
+  { title: "Teaching Help", description: "Remote educational support.", skillsRequired: ["Admin"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "low", priority: 1, status: "open", submittedBy: "NGO Partner" },
 ];
 
 const chartConfig = {
@@ -188,7 +187,7 @@ export default function Dashboard() {
       }
       toast({
         title: "NGO Data Synchronized",
-        description: `Successfully imported ${SAMPLE_NGO_DATA.length} humanitarian tasks.`,
+        description: `Successfully imported sample humanitarian tasks.`,
       });
     } catch (error) {
       // Handled globally
@@ -285,7 +284,7 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
           <div className="lg:col-span-3 space-y-8">
-            <Card className="border-none shadow-xl overflow-hidden min-h-[450px] relative bg-card">
+            <Card className="border-none shadow-xl overflow-hidden h-[450px] relative bg-card">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
                 volunteers={rawVolunteers || []} 

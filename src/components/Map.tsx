@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet"
-import { MapPin } from "lucide-react"
 
 const urgencyColors = {
   high: "#ef4444",   // Red
@@ -16,6 +15,25 @@ interface MapProps {
   center?: [number, number];
   zoom?: number;
 }
+
+// Inline SVG icon for MapPin to avoid ReferenceErrors during bundle resolution
+const MapPinIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="12" 
+    height="12" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className="lucide lucide-map-pin"
+  >
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
 
 function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
   const map = useMap();
@@ -79,8 +97,15 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
   }
 
   return (
-    <div className="h-full w-full min-h-[450px] relative overflow-hidden rounded-xl">
-      <MapContainer center={center} zoom={zoom} scrollWheelZoom={false} className="h-full w-full">
+    <div id="map-container" className="h-[450px] w-full relative overflow-hidden rounded-xl bg-muted border">
+      <MapContainer 
+        id="map"
+        center={center} 
+        zoom={zoom} 
+        scrollWheelZoom={false} 
+        className="h-full w-full"
+        style={{ height: "450px", width: "100%" }}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -97,9 +122,9 @@ export default function InteractiveMap({ tasks, volunteers, center = [20.5937, 7
               <Popup>
                 <div className="space-y-1 min-w-[150px] p-1">
                   <p className="font-bold text-sm leading-tight text-foreground">{task.title}</p>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                     <MapPin className="h-3 w-3" /> {task.location}
-                  </p>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                     <MapPinIcon /> {task.location}
+                  </div>
                   <div className="flex flex-col gap-1 mt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] text-muted-foreground uppercase font-bold">Urgency</span>
