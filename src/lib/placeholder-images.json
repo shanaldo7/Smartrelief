@@ -1,3 +1,16 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "hero",
+      "description": "Diverse group of volunteers working together happily",
+      "imageUrl": "https://picsum.photos/seed/kindred1/1200/600",
+      "imageHint": "volunteers working"
+    },
+    {
+      "id": "community",
+      "description": "People helping each other in a clean modern environment",
+      "imageUrl": "https://picsum.photos/seed/kindred2/800/400",
+      "imageHint": "community helping"
+    }
+  ]
 }
