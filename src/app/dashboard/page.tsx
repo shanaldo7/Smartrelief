@@ -39,6 +39,7 @@ interface Task {
   skillsRequired: string[];
   status: string;
   ownerId: string;
+  submittedBy: string;
   createdAt?: any;
 }
 
@@ -62,11 +63,10 @@ interface Match {
 }
 
 const SAMPLE_NGO_DATA = [
-  { title: "Flood Shelter Support", description: "Assisting families with bedding and food supplies in flooded residential zones.", skillsRequired: ["General Labor", "Admin"], location: "Riverside", latitude: 19.0760, longitude: 72.8777, urgency: "high", priority: 3, status: "open", submittedBy: "Emergency Response NGO" },
-  { title: "First Aid Station Assistance", description: "Looking for healthcare workers to assist at the mobile clinics.", skillsRequired: ["Healthcare"], location: "Downtown", latitude: 18.9220, longitude: 72.8347, urgency: "high", priority: 3, status: "open", submittedBy: "Red Cross" },
-  { title: "Logistics Coordinator", description: "Coordinating truck arrivals and inventory of water supplies.", skillsRequired: ["Admin", "Tech Support"], location: "East Port", latitude: 19.0176, longitude: 72.8561, urgency: "medium", priority: 2, status: "open", submittedBy: "Food Bank" },
-  { title: "Tech Support for Ops Center", description: "Maintaining internet and radio comms for rescue teams.", skillsRequired: ["Tech Support"], location: "Command Center", latitude: 19.1136, longitude: 72.8697, urgency: "medium", priority: 2, status: "open", submittedBy: "Response Corps" },
-  { title: "Neighborhood Cleanup", description: "Clearing debris from local roads to allow emergency access.", skillsRequired: ["General Labor", "Driving"], location: "West Hills", latitude: 19.1828, longitude: 72.8402, urgency: "low", priority: 1, status: "open", submittedBy: "City Council" },
+  { title: "Food Distribution", description: "Providing meals to families in need.", skillsRequired: ["General Labor", "Logistics"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "Food Relief NGO" },
+  { title: "Medical Support", description: "Assisting at a local health clinic.", skillsRequired: ["Healthcare"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "medium", priority: 2, status: "open", submittedBy: "Medical Corps" },
+  { title: "Remote Teaching", description: "Educational support for local children.", skillsRequired: ["Admin", "Tech Support"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "low", priority: 1, status: "open", submittedBy: "EduHelp" },
+  { title: "Emergency Logistics", description: "Coordinating resource arrival at regional hubs.", skillsRequired: ["Logistics", "Admin"], location: "Bangalore", latitude: 12.9716, longitude: 77.5946, urgency: "high", priority: 3, status: "open", submittedBy: "Logistics First" },
 ];
 
 const chartConfig = {
@@ -97,6 +97,10 @@ export default function Dashboard() {
 
   const { data: rawTasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
   const { data: rawVolunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
+
+  const activeTasksForMap = useMemo(() => {
+    return rawTasks?.filter(t => t.status === 'open') || [];
+  }, [rawTasks]);
 
   const filteredTasks = useMemo(() => {
     if (!rawTasks) return [];
@@ -195,13 +199,13 @@ export default function Dashboard() {
   };
 
   const handleFocusCritical = () => {
-    const highUrgency = rawTasks?.find(t => t.urgency === 'high');
+    const highUrgency = rawTasks?.find(t => t.urgency === 'high' && t.status === 'open');
     if (highUrgency && highUrgency.latitude) {
       setMapCenter([highUrgency.latitude, highUrgency.longitude]);
       setMapZoom(12);
       toast({ title: "Map Focused", description: "Zoomed into high-urgency incident zone." });
     } else {
-      toast({ variant: "destructive", title: "No Data", description: "No high-urgency tasks found to focus on." });
+      toast({ variant: "destructive", title: "No Data", description: "No active high-urgency tasks found to focus on." });
     }
   };
 
@@ -254,7 +258,7 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button variant="outline" className="gap-2" onClick={handleFocusCritical}>
-              <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical
+              <Crosshair className="h-4 w-4 text-red-500" /> Focus Critical Area
             </Button>
             <Button 
               variant="default" 
@@ -284,7 +288,7 @@ export default function Dashboard() {
           <div className="lg:col-span-3 space-y-8">
             <Card className="border-none shadow-xl overflow-hidden min-h-[450px] relative">
               <InteractiveMap 
-                tasks={rawTasks || []} 
+                tasks={activeTasksForMap} 
                 volunteers={rawVolunteers || []} 
                 center={mapCenter} 
                 zoom={mapZoom}
@@ -292,16 +296,16 @@ export default function Dashboard() {
               <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border text-[10px] font-bold uppercase space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500 border border-white" /> High Urgency Task
+                    <div className="w-3 h-3 rounded-full bg-red-500 border border-white" /> High Urgency
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-amber-500 border border-white" /> Medium Urgency Task
+                    <div className="w-3 h-3 rounded-full bg-amber-500 border border-white" /> Medium Urgency
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white" /> Low Urgency Task
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white" /> Low Urgency
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-500 border border-white" /> Registered Rescuer
+                    <div className="w-3 h-3 rounded-full bg-blue-500 border border-white" /> Rescuer
                   </div>
                 </div>
               </div>
@@ -314,11 +318,6 @@ export default function Dashboard() {
                    <TabsTrigger value="tasks" className="rounded-lg">Incident Feed</TabsTrigger>
                    <TabsTrigger value="volunteers" className="rounded-lg">Rescuers</TabsTrigger>
                  </TabsList>
-                 {locationFilter !== 'all' && (
-                   <Badge variant="secondary" className="gap-1">
-                     <MapPin className="h-3 w-3" /> Area: {locationFilter}
-                   </Badge>
-                 )}
                </div>
 
                <TabsContent value="matches" className="space-y-6">
@@ -332,7 +331,7 @@ export default function Dashboard() {
                            </div>
                          </div>
                          <CardHeader className="pb-2">
-                           <CardTitle className="text-lg flex items-center gap-2 font-bold">Pairing</CardTitle>
+                           <CardTitle className="text-lg flex items-center gap-2 font-bold">Smart Pairing</CardTitle>
                          </CardHeader>
                          <CardContent className="space-y-4 flex-grow">
                            <div className="p-3 bg-muted/30 rounded-xl">
@@ -346,7 +345,7 @@ export default function Dashboard() {
                          </CardContent>
                          <CardFooter className="pt-2">
                             <Button className="w-full gap-2" size="sm" onClick={() => handleAssignVolunteer(match.taskId, match.volunteerName)}>
-                              <CheckCircle2 className="h-4 w-4" /> Assign
+                              <CheckCircle2 className="h-4 w-4" /> Assign Rescuer
                             </Button>
                          </CardFooter>
                        </Card>
@@ -381,11 +380,13 @@ export default function Dashboard() {
                          <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
                        </CardContent>
                        <CardFooter className="pt-0 flex gap-2">
-                         <Button variant="ghost" size="sm" className="flex-1 text-xs" onClick={() => handleMarkAsCompleted(task.id)}>
-                           <CheckCircle className="h-3 w-3 mr-2" /> Complete
-                         </Button>
+                         {task.status === 'open' && (
+                           <Button variant="ghost" size="sm" className="flex-1 text-xs" onClick={() => handleMarkAsCompleted(task.id)}>
+                             <CheckCircle className="h-3 w-3 mr-2" /> Complete
+                           </Button>
+                         )}
                          <Button variant="outline" size="sm" className="text-xs" onClick={() => { setMapCenter([task.latitude, task.longitude]); setMapZoom(15); }}>
-                           <MapIcon className="h-3 w-3" /> View
+                           <MapIcon className="h-3 w-3" /> View Map
                          </Button>
                        </CardFooter>
                      </Card>
@@ -445,7 +446,7 @@ export default function Dashboard() {
                 
                 <div className="mt-6 space-y-1">
                   <Button variant={locationFilter === 'all' ? 'default' : 'ghost'} size="sm" className="w-full justify-start text-xs h-8" onClick={() => setLocationFilter('all')}>
-                    <Activity className="h-3 w-3 mr-2" /> Global View
+                    <Activity className="h-3 w-3 mr-2" /> Global Perspective
                   </Button>
                   {areaImpact.map((area) => (
                     <Button key={area.name} variant={locationFilter === area.name ? 'secondary' : 'ghost'} size="sm" className="w-full justify-between text-xs h-8" onClick={() => setLocationFilter(area.name)}>
@@ -459,7 +460,7 @@ export default function Dashboard() {
 
             <Card className="border-none shadow-sm bg-accent/5">
                <CardHeader className="pb-2">
-                 <CardTitle className="text-xs font-bold uppercase text-accent">Status Update</CardTitle>
+                 <CardTitle className="text-xs font-bold uppercase text-accent">Optimization Log</CardTitle>
                </CardHeader>
                <CardContent className="space-y-4">
                   <div className="p-3 bg-white rounded-lg border-l-4 border-emerald-500 shadow-sm text-[11px] leading-relaxed">
