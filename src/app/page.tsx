@@ -159,9 +159,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <div className="container mx-auto px-4 mt-20 pt-8 border-t border-white/5 text-center">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">© 2024 SmartRelief Strategic Operations. Tactical Authorized.</p>
-        </div>
       </footer>
     </div>
   );
