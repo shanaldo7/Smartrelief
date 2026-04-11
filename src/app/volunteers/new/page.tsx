@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ShieldCheck, Navigation, Mail, User } from "lucide-react";
+import { ShieldCheck, Navigation, Mail, User, CheckCircle2 } from "lucide-react";
 import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
@@ -157,23 +156,27 @@ export default function NewVolunteer() {
               <div className="space-y-4">
                 <Label className="font-bold text-[10px] uppercase text-muted-foreground ml-1">Support Expertise</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  {SKILLS.map(skill => (
-                    <div 
-                      key={skill} 
-                      className={cn(
-                        "flex items-center space-x-3 border-2 rounded-2xl p-4 transition-all cursor-pointer hover:border-primary/50",
-                        selectedSkills.includes(skill) ? "bg-primary/5 border-primary shadow-sm" : "bg-card"
-                      )}
-                      onClick={() => handleSkillToggle(skill)}
-                    >
-                      <Checkbox 
-                        id={`skill-${skill}`} 
-                        checked={selectedSkills.includes(skill)} 
-                        className="rounded-full h-5 w-5 border-2 pointer-events-none"
-                      />
-                      <Label className="flex-grow cursor-pointer font-bold text-xs uppercase tracking-tight pointer-events-none">{skill}</Label>
-                    </div>
-                  ))}
+                  {SKILLS.map(skill => {
+                    const isSelected = selectedSkills.includes(skill);
+                    return (
+                      <div 
+                        key={skill} 
+                        className={cn(
+                          "flex items-center space-x-3 border-2 rounded-2xl p-4 transition-all cursor-pointer hover:border-primary/50",
+                          isSelected ? "bg-primary/5 border-primary shadow-sm" : "bg-card"
+                        )}
+                        onClick={() => handleSkillToggle(skill)}
+                      >
+                        <div className={cn(
+                          "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                          isSelected ? "bg-primary border-primary text-white" : "bg-transparent border-muted-foreground/30"
+                        )}>
+                          {isSelected && <CheckCircle2 className="h-4 w-4" />}
+                        </div>
+                        <span className="flex-grow font-bold text-xs uppercase tracking-tight">{skill}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>
