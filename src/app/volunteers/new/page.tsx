@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,11 +59,11 @@ export default function NewVolunteer() {
     );
   };
 
-  const handleSkillToggle = (skill: string) => {
+  const handleSkillToggle = useCallback((skill: string) => {
     setSelectedSkills(prev => 
       prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
     );
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +115,7 @@ export default function NewVolunteer() {
               <ShieldCheck className="h-6 w-6" />
               <span className="font-bold uppercase tracking-widest text-xs">Responder Enrollment</span>
             </div>
-            <CardTitle className="text-3xl font-black font-headline uppercase">Volunteer as a Rescuer</CardTitle>
+            <CardTitle className="text-3xl font-black font-headline uppercase leading-tight">Volunteer as a Rescuer</CardTitle>
             <CardDescription className="font-medium italic">Join the grid to receive real-time alerts for local humanitarian needs.</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
@@ -162,18 +162,18 @@ export default function NewVolunteer() {
                       <div 
                         key={skill} 
                         className={cn(
-                          "flex items-center space-x-3 border-2 rounded-2xl p-4 transition-all cursor-pointer hover:border-primary/50",
-                          isSelected ? "bg-primary/5 border-primary shadow-sm" : "bg-card"
+                          "flex items-center space-x-3 border-2 rounded-2xl p-4 transition-all cursor-pointer",
+                          isSelected ? "bg-primary/5 border-primary shadow-sm" : "bg-card border-border hover:border-primary/50"
                         )}
                         onClick={() => handleSkillToggle(skill)}
                       >
                         <div className={cn(
-                          "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors",
+                          "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-colors pointer-events-none",
                           isSelected ? "bg-primary border-primary text-white" : "bg-transparent border-muted-foreground/30"
                         )}>
                           {isSelected && <CheckCircle2 className="h-4 w-4" />}
                         </div>
-                        <span className="flex-grow font-bold text-xs uppercase tracking-tight">{skill}</span>
+                        <span className="flex-grow font-bold text-xs uppercase tracking-tight pointer-events-none">{skill}</span>
                       </div>
                     );
                   })}
