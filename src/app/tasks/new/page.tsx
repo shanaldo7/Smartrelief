@@ -16,11 +16,14 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { smartTaskDescriptionAssistant } from "@/ai/flows/smart-task-description-assistant";
 
+const CATEGORIES = ["Food", "Medical", "Teaching", "Logistics", "Admin", "General Support"];
+
 export default function NewTask() {
   const db = useFirestore();
   const { user } = useUser();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("Food");
   const [location, setLocation] = useState("");
   const [coords, setCoords] = useState("19.0760, 72.8777");
   const [urgency, setUrgency] = useState("medium");
@@ -87,6 +90,7 @@ export default function NewTask() {
         id: taskRef.id,
         title,
         description,
+        category,
         location,
         latitude: lat,
         longitude: lng,
@@ -98,6 +102,15 @@ export default function NewTask() {
         submittedBy: user.displayName || "NGO Partner",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // Log activity
+      const actRef = doc(collection(db, "activities"));
+      setDocumentNonBlocking(actRef, {
+        id: actRef.id,
+        type: "new_task",
+        message: `New ${category} mission published: ${title} in ${location}`,
+        timestamp: serverTimestamp()
       }, { merge: true });
       
       toast({ title: "Success!", description: "Task pinned to operational map." });
@@ -125,6 +138,18 @@ export default function NewTask() {
               <div className="space-y-2">
                 <Label htmlFor="title" className="font-bold text-xs uppercase text-muted-foreground">Mission Title</Label>
                 <Input id="title" placeholder="e.g. Emergency Medical Supplies" className="rounded-xl h-12" value={title} onChange={e => setTitle(e.target.value)} required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category" className="font-bold text-xs uppercase text-muted-foreground">Aid Sector</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="rounded-xl h-12"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
@@ -163,7 +188,6 @@ export default function NewTask() {
                   </Button>
                 </div>
                 <Input id="coords" placeholder="e.g. 19.0760, 72.8777" className="rounded-xl h-12 font-mono text-xs" value={coords} onChange={e => setCoords(e.target.value)} required />
-                <p className="text-[10px] text-muted-foreground italic">Tip: Copy coordinates from any map app and paste here.</p>
               </div>
 
               <div className="space-y-2">

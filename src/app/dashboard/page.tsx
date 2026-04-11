@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
-import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target, LocateFixed, Briefcase, UserCircle } from "lucide-react";
+import { collection, serverTimestamp, doc, query, orderBy, limit } from "firebase/firestore";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route, UserCheck, ShieldCheck, Target, LocateFixed, Briefcase, UserCircle, Filter, FilterX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -19,7 +19,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { Bar, BarChart, XAxis, YAxis, Cell } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const InteractiveMap = dynamic(() => import("@/components/Map"), { 
   ssr: false,
@@ -30,6 +31,7 @@ interface Task {
   id: string;
   title: string;
   description: string;
+  category: string;
   location: string;
   latitude: number;
   longitude: number;
@@ -64,10 +66,16 @@ interface Match {
   distance: string;
 }
 
-// Haversine formula to calculate distance in KM
+interface ActivityLog {
+  id: string;
+  message: string;
+  type: "new_task" | "assigned" | "completed";
+  timestamp: any;
+}
+
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 9999;
-  const R = 6371; // Earth radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -79,9 +87,9 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 }
 
 const SAMPLE_NGO_DATA = [
-  { title: "Critical Food Supply Chain", description: "Strategic distribution network for 1500+ displaced families in North Sector.", skillsRequired: ["Logistics", "Operations"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "WFP Operational Partner" },
-  { title: "Mobile Trauma Unit", description: "Emergency clinical support for high-impact zones in Central Delhi.", skillsRequired: ["Healthcare", "Emergency Medicine"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "high", priority: 3, status: "open", submittedBy: "Medical Corps" },
-  { title: "Relief Logistics Hub", description: "Tier 1 warehouse management for incoming international aid supplies.", skillsRequired: ["Logistics", "Inventory"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "medium", priority: 2, status: "open", submittedBy: "Logistics Cluster" },
+  { title: "Critical Food Supply Chain", category: "Food", description: "Strategic distribution network for 1500+ displaced families in North Sector.", skillsRequired: ["Logistics", "Operations"], location: "Kolkata", latitude: 22.5726, longitude: 88.3639, urgency: "high", priority: 3, status: "open", submittedBy: "WFP Operational Partner" },
+  { title: "Mobile Trauma Unit", category: "Medical", description: "Emergency clinical support for high-impact zones in Central Delhi.", skillsRequired: ["Healthcare", "Emergency Medicine"], location: "Delhi", latitude: 28.6139, longitude: 77.2090, urgency: "high", priority: 3, status: "open", submittedBy: "Medical Corps" },
+  { title: "Relief Logistics Hub", category: "Logistics", description: "Tier 1 warehouse management for incoming international aid supplies.", skillsRequired: ["Logistics", "Inventory"], location: "Mumbai", latitude: 19.0760, longitude: 72.8777, urgency: "medium", priority: 2, status: "open", submittedBy: "Logistics Cluster" },
 ];
 
 const chartConfig = {
@@ -98,6 +106,8 @@ export default function Dashboard() {
   const [simulationRole, setSimulationRole] = useState<"ngo" | "volunteer">("ngo");
   const [isImporting, setIsImporting] = useState(false);
   const [locationFilter, setLocationFilter] = useState<string>("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
   const [mapZoom, setMapZoom] = useState(5);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
@@ -114,8 +124,14 @@ export default function Dashboard() {
     return collection(db, "volunteerProfiles");
   }, [db]);
 
+  const activitiesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, "activities"), orderBy("timestamp", "desc"), limit(10));
+  }, [db]);
+
   const { data: rawTasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
   const { data: rawVolunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
+  const { data: activities, isLoading: activitiesLoading } = useCollection<ActivityLog>(activitiesQuery);
 
   const activeTasksForMap = useMemo(() => {
     return rawTasks?.filter(t => t.status === 'open') || [];
@@ -128,16 +144,17 @@ export default function Dashboard() {
   const filteredTasks = useMemo(() => {
     if (!rawTasks) return [];
     let filtered = [...rawTasks];
-    if (locationFilter !== "all") {
-      filtered = filtered.filter(t => t.location === locationFilter);
-    }
+    if (locationFilter !== "all") filtered = filtered.filter(t => t.location === locationFilter);
+    if (urgencyFilter !== "all") filtered = filtered.filter(t => t.urgency === urgencyFilter);
+    if (categoryFilter !== "all") filtered = filtered.filter(t => t.category === categoryFilter);
+
     return filtered.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       const dateA = a.createdAt?.toMillis?.() || 0;
       const dateB = b.createdAt?.toMillis?.() || 0;
       return dateB - dateA;
     });
-  }, [rawTasks, locationFilter]);
+  }, [rawTasks, locationFilter, urgencyFilter, categoryFilter]);
 
   const myAssignments = useMemo(() => {
     if (!rawTasks || !user) return [];
@@ -155,29 +172,16 @@ export default function Dashboard() {
 
   const matches = useMemo(() => {
     if (!rawTasks || !sortedVolunteers) return [];
-    
     const results: Match[] = [];
     rawTasks.filter(t => t.status === 'open').forEach(task => {
       sortedVolunteers.forEach(volunteer => {
-        const dist = getDistance(
-          task.latitude, task.longitude,
-          volunteer.latitude, volunteer.longitude
-        );
-
+        const dist = getDistance(task.latitude, task.longitude, volunteer.latitude, volunteer.longitude);
         let score = 0;
         const reasons: string[] = [];
-
-        // 1. Proximity Scoring (HEAVY WEIGHT - SMART LOGIC)
         const proximityScore = Math.max(0, 150 - (dist / 2)); 
         score += proximityScore;
-        
-        if (dist < 5) {
-          reasons.push("Critical Proximity (<5km)");
-        } else if (dist < 25) {
-          reasons.push("Immediate Sector (<25km)");
-        }
-
-        // 2. Skill Alignment
+        if (dist < 5) reasons.push("Critical Proximity (<5km)");
+        else if (dist < 25) reasons.push("Immediate Sector (<25km)");
         const matchedSkills = task.skillsRequired.filter(skill => 
           volunteer.skills.some(vSkill => vSkill.toLowerCase() === skill.toLowerCase())
         );
@@ -185,10 +189,7 @@ export default function Dashboard() {
           score += matchedSkills.length * 40;
           reasons.push(`${matchedSkills.length} Required Skills`);
         }
-
-        // 3. Urgency / Priority
         score += (task.priority * 20);
-
         if (score > 60) {
           results.push({
             taskId: task.id,
@@ -203,7 +204,6 @@ export default function Dashboard() {
         }
       });
     });
-
     return results.sort((a, b) => b.score - a.score);
   }, [rawTasks, sortedVolunteers]);
 
@@ -228,6 +228,17 @@ export default function Dashboard() {
       .sort((a, b) => b.tasks - a.tasks);
   }, [rawTasks]);
 
+  const logActivity = useCallback((type: "new_task" | "assigned" | "completed", message: string) => {
+    if (!db) return;
+    const actRef = doc(collection(db, "activities"));
+    setDocumentNonBlocking(actRef, {
+      id: actRef.id,
+      type,
+      message,
+      timestamp: serverTimestamp()
+    }, { merge: true });
+  }, [db]);
+
   const handleTaskSelect = useCallback((taskId: string | null) => {
     setSelectedTaskId(taskId);
     if (taskId) {
@@ -239,6 +250,25 @@ export default function Dashboard() {
     }
   }, [rawTasks]);
 
+  const handleFocusEmergency = useCallback(() => {
+    if (!rawTasks) return;
+    const criticalTask = [...rawTasks]
+      .filter(t => t.status === 'open')
+      .sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
+        return 0;
+      })[0];
+
+    if (criticalTask) {
+      setSelectedTaskId(criticalTask.id);
+      setMapCenter([criticalTask.latitude, criticalTask.longitude]);
+      setMapZoom(16);
+      toast({ title: "Focus Locked", description: `Emergency focal point: ${criticalTask.title}` });
+    } else {
+      toast({ variant: "destructive", title: "No Emergencies", description: "All sectors currently operational." });
+    }
+  }, [rawTasks, toast]);
+
   const handleRegionClick = useCallback((regionName: string) => {
     setLocationFilter(regionName);
     setSelectedTaskId(null);
@@ -247,7 +277,6 @@ export default function Dashboard() {
       setMapZoom(5);
       return;
     }
-
     const regionalTask = rawTasks?.find(t => t.location === regionName);
     if (regionalTask && regionalTask.latitude && regionalTask.longitude) {
       setMapCenter([regionalTask.latitude, regionalTask.longitude]);
@@ -257,10 +286,9 @@ export default function Dashboard() {
 
   const handleLocateMe = useCallback(() => {
     if (!navigator.geolocation) {
-      toast({ variant: "destructive", title: "Access Denied", description: "Geolocation services are required." });
+      toast({ variant: "destructive", title: "Access Denied", description: "Geolocation required." });
       return;
     }
-
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -269,11 +297,11 @@ export default function Dashboard() {
         setMapCenter([latitude, longitude]);
         setMapZoom(14);
         setIsLocating(false);
-        toast({ title: "Coordinates Locked", description: "Your current responder position has been verified." });
+        toast({ title: "Position Locked", description: "Responder position verified." });
       },
       () => {
         setIsLocating(false);
-        toast({ variant: "destructive", title: "Sync Failed", description: "Check browser permissions." });
+        toast({ variant: "destructive", title: "Sync Failed", description: "Check permissions." });
       },
       { enableHighAccuracy: true }
     );
@@ -292,34 +320,39 @@ export default function Dashboard() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         }, { merge: true });
+        logActivity("new_task", `New ${item.category} mission added in ${item.location}`);
       }
-      toast({ title: "Database Synchronized", description: "Imported verified humanitarian missions." });
+      toast({ title: "Database Synchronized", description: "Imported verified missions." });
     } catch (error) { } finally {
       setIsImporting(false);
     }
-  }, [db, user, toast]);
+  }, [db, user, toast, logActivity]);
 
   const handleAssignVolunteer = useCallback((taskId: string, volunteerName: string) => {
     if (!db) return;
+    const task = rawTasks?.find(t => t.id === taskId);
     const taskRef = doc(db, "tasks", taskId);
     updateDocumentNonBlocking(taskRef, {
       status: "assigned",
       assignedTo: volunteerName,
       updatedAt: serverTimestamp(),
     });
-    toast({ title: "Mission Assigned", description: `${volunteerName} has been deployed.` });
-  }, [db, toast]);
+    logActivity("assigned", `${volunteerName} assigned to ${task?.title || 'task'} (${task?.location})`);
+    toast({ title: "Mission Assigned", description: `${volunteerName} deployed.` });
+  }, [db, toast, rawTasks, logActivity]);
 
   const handleMarkAsCompleted = useCallback((taskId: string) => {
     if (!db) return;
+    const task = rawTasks?.find(t => t.id === taskId);
     const taskRef = doc(db, "tasks", taskId);
     updateDocumentNonBlocking(taskRef, {
       status: "completed",
       updatedAt: serverTimestamp(),
     });
+    logActivity("completed", `Task completed: ${task?.title} (${task?.location})`);
     if (selectedTaskId === taskId) setSelectedTaskId(null);
     toast({ title: "Mission Successful", description: `Field request resolved.` });
-  }, [db, selectedTaskId, toast]);
+  }, [db, selectedTaskId, toast, rawTasks, logActivity]);
 
   if (isUserLoading || tasksLoading || volunteersLoading) {
     return (
@@ -369,6 +402,14 @@ export default function Dashboard() {
             </div>
             <div className="flex gap-4">
               <Button 
+                variant="destructive" 
+                className="h-12 px-6 rounded-xl font-black uppercase tracking-widest shadow-xl shadow-destructive/20 gap-2 border-2" 
+                onClick={handleFocusEmergency}
+              >
+                <AlertTriangle className="h-5 w-5" />
+                🚨 Focus Emergency
+              </Button>
+              <Button 
                 variant="outline" 
                 className="h-12 px-6 rounded-xl font-bold gap-2 border-2" 
                 onClick={handleLocateMe}
@@ -377,21 +418,45 @@ export default function Dashboard() {
                 <Navigation className={cn("h-5 w-5", isLocating && "animate-pulse")} />
                 {isLocating ? "Locating..." : "Detect Position"}
               </Button>
-              <Button 
-                variant="default" 
-                className="h-12 px-6 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2"
-                onClick={handleFetchNGOData}
-                disabled={isImporting}
-              >
-                <Database className="h-5 w-5" />
-                Sync Data
-              </Button>
             </div>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
           <div className="lg:col-span-9 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/30 p-4 rounded-3xl border-2">
+               <div className="space-y-1">
+                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Filter Sector</p>
+                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                   <SelectTrigger className="rounded-xl border-2"><SelectValue placeholder="Category" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="all">All Categories</SelectItem>
+                     <SelectItem value="Food">Food Relief</SelectItem>
+                     <SelectItem value="Medical">Medical Support</SelectItem>
+                     <SelectItem value="Teaching">Education</SelectItem>
+                     <SelectItem value="Logistics">Supply Chain</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-1">
+                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Urgency Threshold</p>
+                 <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                   <SelectTrigger className="rounded-xl border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="all">All Levels</SelectItem>
+                     <SelectItem value="high">Critical Only</SelectItem>
+                     <SelectItem value="medium">Medium + High</SelectItem>
+                     <SelectItem value="low">Standard</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="flex items-end">
+                 <Button variant="ghost" className="w-full rounded-xl font-black uppercase text-[10px] tracking-widest h-10 border-2 border-dashed" onClick={() => { setCategoryFilter('all'); setUrgencyFilter('all'); setLocationFilter('all'); }}>
+                   <FilterX className="h-4 w-4 mr-2" /> Reset Filters
+                 </Button>
+               </div>
+            </div>
+
             <Card className="border-2 shadow-2xl overflow-hidden h-[500px] relative bg-card rounded-3xl">
               <InteractiveMap 
                 tasks={activeTasksForMap} 
@@ -484,10 +549,13 @@ export default function Dashboard() {
                        <Card key={task.id} className={cn("border-2 shadow-md bg-card rounded-3xl overflow-hidden", task.status === 'completed' && "opacity-50")}>
                          <CardHeader className="pb-4">
                            <div className="flex justify-between items-start mb-3">
-                             <Badge className={cn("text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-xl", 
-                               task.urgency === 'high' ? "bg-destructive text-destructive-foreground" : "bg-primary text-white")}>
-                               {task.urgency}
-                             </Badge>
+                             <div className="flex gap-2">
+                               <Badge className={cn("text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-xl", 
+                                 task.urgency === 'high' ? "bg-destructive text-destructive-foreground" : "bg-primary text-white")}>
+                                 {task.urgency}
+                               </Badge>
+                               <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-2">{task.category}</Badge>
+                             </div>
                              <div className="flex items-center gap-2 text-muted-foreground text-xs font-black uppercase tracking-wider">
                                <MapPin className="h-4 w-4 text-primary" /> {task.location}
                              </div>
@@ -575,7 +643,7 @@ export default function Dashboard() {
                            </div>
                            <CardHeader className="pb-4">
                              <CardTitle className="text-xl font-black text-foreground">{task.title}</CardTitle>
-                             <CardDescription className="font-bold text-muted-foreground">{task.location}</CardDescription>
+                             <CardDescription className="font-bold text-muted-foreground">{task.category} • {task.location}</CardDescription>
                            </CardHeader>
                            <CardContent className="space-y-4 flex-grow">
                              <p className="text-sm text-muted-foreground leading-relaxed italic line-clamp-2">"{task.description}"</p>
@@ -643,7 +711,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="pt-8 space-y-8">
                 <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -10 }}>
+                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -10 }} onClick={(data) => { if (data.activeLabel) handleRegionClick(data.activeLabel); }}>
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[10px] font-black uppercase text-muted-foreground" />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
@@ -673,17 +741,26 @@ export default function Dashboard() {
                <CardHeader className="pb-4 bg-muted border-b-2">
                  <CardTitle className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-3">
                    <Activity className="h-5 w-5 text-emerald-500" />
-                   System Logs
+                   Live Activity Feed
                  </CardTitle>
                </CardHeader>
-               <CardContent className="space-y-5 pt-8 p-6">
-                  <div className="p-5 bg-card rounded-2xl border-l-8 border-emerald-500 shadow-sm text-[12px] font-bold leading-relaxed">
-                    Distance-based matching is active. Closest responders are prioritized.
-                    <span className="block mt-2 text-emerald-600 font-black tracking-widest uppercase text-[10px]">Strategic Sync Active.</span>
-                  </div>
-                  <div className="p-5 bg-card rounded-2xl border-l-8 border-primary shadow-sm text-[12px] font-bold leading-relaxed">
-                    Role Simulation: <span className="text-primary font-black uppercase">{simulationRole} Perspective</span> enabled.
-                  </div>
+               <CardContent className="pt-6 px-6 pb-8 space-y-4">
+                  {activitiesLoading ? (
+                    <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                  ) : activities && activities.length > 0 ? (
+                    activities.map(act => (
+                      <div key={act.id} className="p-4 bg-card rounded-xl border-l-4 shadow-sm text-[11px] leading-relaxed relative overflow-hidden group border-primary/20">
+                         <div className={cn("absolute top-0 left-0 bottom-0 w-1", 
+                            act.type === 'new_task' ? "bg-primary" : 
+                            act.type === 'assigned' ? "bg-amber-500" : "bg-emerald-500")} 
+                         />
+                         <p className="font-bold text-foreground">{act.message}</p>
+                         <p className="text-[9px] text-muted-foreground mt-1 uppercase font-black">{act.timestamp?.toMillis ? new Date(act.timestamp.toMillis()).toLocaleTimeString() : 'Just now'}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-[10px] font-black uppercase text-muted-foreground opacity-50">Grid Quiet. No activities reported.</div>
+                  )}
                </CardContent>
             </Card>
           </aside>

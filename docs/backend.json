@@ -83,6 +83,11 @@
           "type": "string",
           "description": "A detailed description of the help required, potentially enhanced by an AI assistant."
         },
+        "category": {
+          "type": "string",
+          "enum": ["Food", "Medical", "Teaching", "Logistics", "Admin", "General Support"],
+          "description": "The sector or type of aid required."
+        },
         "skillsRequired": {
           "type": "array",
           "description": "A list of skills necessary to complete the task.",
@@ -118,6 +123,10 @@
           "type": "string",
           "description": "The name of the organization or individual who submitted the task."
         },
+        "assignedTo": {
+          "type": "string",
+          "description": "The name of the volunteer assigned to this task."
+        },
         "createdAt": {
           "type": "string",
           "description": "Timestamp when the task was submitted.",
@@ -127,18 +136,13 @@
           "type": "string",
           "description": "Timestamp when the task was last updated.",
           "format": "date-time"
-        },
-        "dueDate": {
-          "type": "string",
-          "description": "Optional due date for the task.",
-          "format": "date-time"
         }
       },
       "required": [
         "id",
         "title",
         "description",
-        "skillsRequired",
+        "category",
         "location",
         "latitude",
         "longitude",
@@ -149,56 +153,29 @@
         "createdAt"
       ]
     },
-    "Match": {
+    "ActivityLog": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Match",
+      "title": "ActivityLog",
       "type": "object",
-      "description": "Represents a proposed or confirmed pairing between a volunteer and a task based on matching criteria.",
+      "description": "A real-time log of humanitarian activities across the system.",
       "properties": {
         "id": {
-          "type": "string",
-          "description": "Unique identifier for the Match entity."
+          "type": "string"
         },
-        "volunteerId": {
+        "message": {
           "type": "string",
-          "description": "Reference to the VolunteerProfile involved in this match. (Relationship: VolunteerProfile 1:N Match)"
+          "description": "The descriptive message of the event."
         },
-        "taskId": {
+        "type": {
           "type": "string",
-          "description": "Reference to the Task involved in this match. (Relationship: Task 1:N Match)"
+          "enum": ["new_task", "assigned", "completed"]
         },
-        "matchScore": {
-          "type": "number",
-          "description": "A numerical score indicating the quality of the match, based on skills, location, and urgency."
-        },
-        "status": {
+        "timestamp": {
           "type": "string",
-          "description": "The current status of the match (e.g., 'proposed', 'accepted', 'rejected', 'completed')."
-        },
-        "proposedAt": {
-          "type": "string",
-          "description": "Timestamp when the match was proposed.",
-          "format": "date-time"
-        },
-        "acceptedAt": {
-          "type": "string",
-          "description": "Timestamp when the volunteer accepted the match.",
-          "format": "date-time"
-        },
-        "rejectedAt": {
-          "type": "string",
-          "description": "Timestamp when the volunteer rejected the match.",
           "format": "date-time"
         }
       },
-      "required": [
-        "id",
-        "volunteerId",
-        "taskId",
-        "matchScore",
-        "status",
-        "proposedAt"
-      ]
+      "required": ["id", "message", "type", "timestamp"]
     }
   },
   "auth": {
@@ -216,13 +193,7 @@
           "schema": {
             "$ref": "#/backend/entities/VolunteerProfile"
           },
-          "description": "Stores individual volunteer profiles.",
-          "params": [
-            {
-              "name": "volunteerId",
-              "description": "The unique ID of the volunteer."
-            }
-          ]
+          "description": "Stores individual volunteer profiles."
         }
       },
       {
@@ -232,29 +203,17 @@
           "schema": {
             "$ref": "#/backend/entities/Task"
           },
-          "description": "Stores task details.",
-          "params": [
-            {
-              "name": "taskId",
-              "description": "The unique ID of the task."
-            }
-          ]
+          "description": "Stores task details."
         }
       },
       {
-        "path": "/matches/{matchId}",
+        "path": "/activities/{activityId}",
         "definition": {
-          "entityName": "Match",
+          "entityName": "ActivityLog",
           "schema": {
-            "$ref": "#/backend/entities/Match"
+            "$ref": "#/backend/entities/ActivityLog"
           },
-          "description": "Records volunteer-to-task pairings.",
-          "params": [
-            {
-              "name": "matchId",
-              "description": "The unique ID of the match."
-            }
-          ]
+          "description": "Stores audit logs of events."
         }
       }
     ]
