@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "VolunteerProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "VolunteerProfile",
+      "type": "object",
+      "description": "Represents a volunteer's profile, including their personal information, skills, and location, used for matching with tasks.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the VolunteerProfile entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the volunteer."
+        },
+        "email": {
+          "type": "string",
+          "description": "The volunteer's email address.",
+          "format": "email"
+        },
+        "skills": {
+          "type": "array",
+          "description": "A list of key skills the volunteer possesses.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "type": "string",
+          "description": "The geographical location of the volunteer."
+        },
+        "availability": {
+          "type": "string",
+          "description": "General availability of the volunteer (e.g., 'weekends', 'evenings', 'flexible')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the volunteer profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the volunteer profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "email",
+        "skills",
+        "location",
+        "createdAt"
+      ]
+    },
+    "Task": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Task",
+      "type": "object",
+      "description": "Represents a task or need submitted by an organization or individual, requiring volunteer assistance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Task entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "A concise title for the task."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the help required, potentially enhanced by an AI assistant."
+        },
+        "skillsRequired": {
+          "type": "array",
+          "description": "A list of skills necessary to complete the task.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "location": {
+          "type": "string",
+          "description": "The geographical location where the task needs to be performed."
+        },
+        "urgency": {
+          "type": "string",
+          "description": "The urgency level of the task ('high', 'medium', 'low')."
+        },
+        "priority": {
+          "type": "number",
+          "description": "A numerical representation of urgency (3 for high, 2 for medium, 1 for low)."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the task (e.g., 'open', 'assigned', 'completed', 'cancelled')."
+        },
+        "submittedBy": {
+          "type": "string",
+          "description": "The name of the organization or individual who submitted the task."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the task was submitted.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the task was last updated.",
+          "format": "date-time"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Optional due date for the task.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "skillsRequired",
+        "location",
+        "urgency",
+        "priority",
+        "status",
+        "submittedBy",
+        "createdAt"
+      ]
+    },
+    "Match": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Match",
+      "type": "object",
+      "description": "Represents a proposed or confirmed pairing between a volunteer and a task based on matching criteria.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Match entity."
+        },
+        "volunteerId": {
+          "type": "string",
+          "description": "Reference to the VolunteerProfile involved in this match. (Relationship: VolunteerProfile 1:N Match)"
+        },
+        "taskId": {
+          "type": "string",
+          "description": "Reference to the Task involved in this match. (Relationship: Task 1:N Match)"
+        },
+        "matchScore": {
+          "type": "number",
+          "description": "A numerical score indicating the quality of the match, based on skills, location, and urgency."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the match (e.g., 'proposed', 'accepted', 'rejected', 'completed')."
+        },
+        "proposedAt": {
+          "type": "string",
+          "description": "Timestamp when the match was proposed.",
+          "format": "date-time"
+        },
+        "acceptedAt": {
+          "type": "string",
+          "description": "Timestamp when the volunteer accepted the match.",
+          "format": "date-time"
+        },
+        "rejectedAt": {
+          "type": "string",
+          "description": "Timestamp when the volunteer rejected the match.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "volunteerId",
+        "taskId",
+        "matchScore",
+        "status",
+        "proposedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/volunteerProfiles/{volunteerId}",
+        "definition": {
+          "entityName": "VolunteerProfile",
+          "schema": {
+            "$ref": "#/backend/entities/VolunteerProfile"
+          },
+          "description": "Stores individual volunteer profiles. The document ID is the user's UID (volunteerId). Includes denormalized 'id' field matching the document ID for rule validation. Access: Read by all authenticated users (for matching), write/update/delete only by the owner.",
+          "params": [
+            {
+              "name": "volunteerId",
+              "description": "The unique ID of the volunteer, which is also the user's Firebase Authentication UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tasks/{taskId}",
+        "definition": {
+          "entityName": "Task",
+          "schema": {
+            "$ref": "#/backend/entities/Task"
+          },
+          "description": "Stores task details. Each task includes an 'ownerId' field (the UID of the user who created it) for write authorization. The 'id' field matches the document ID. Access: Read by all authenticated users (for dashboard, matching), write/update/delete only by the owner.",
+          "params": [
+            {
+              "name": "taskId",
+              "description": "The unique ID of the task."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/matches/{matchId}",
+        "definition": {
+          "entityName": "Match",
+          "schema": {
+            "$ref": "#/backend/entities/Match"
+          },
+          "description": "Records proposed or confirmed volunteer-to-task pairings. Includes 'volunteerId' and denormalized 'taskOwnerId' to enable Authorization Independence without 'get()' calls in security rules. The 'id' field matches the document ID. Access: Read by the associated volunteer or task owner, write/update (e.g., status changes) by the volunteer or admin.",
+          "params": [
+            {
+              "name": "matchId",
+              "description": "The unique ID of the match."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/admins/{adminId}",
+        "definition": {
+          "entityName": "Admin",
+          "schema": {
+            "$ref": "#/backend/entities/VolunteerProfile"
+          },
+          "description": "A collection for Database Access Control (DBAC). The existence of a document at this path signifies that 'adminId' (which is the user's UID) has administrative privileges. Used for enforcing global roles, e.g., for data import actions. No specific schema, existence is the key.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "The unique ID of an administrator, which is their Firebase Authentication UID."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure prioritizes secure, scalable, and debuggable authorization by strictly adhering to Authorization Independence and Structural Segregation principles. Each core entity—VolunteerProfile, Task, and Match—is housed in its own top-level collection, ensuring homogeneous security requirements within each collection.\n\n1.  **Volunteer Profiles (`/volunteerProfiles/{volunteerId}`):**\n    *   **Justification:** Volunteer profiles are treated as private data, primarily owned by the individual volunteer. The document ID (`volunteerId`) is designed to directly correspond to the Firebase `request.auth.uid` of the logged-in user. This provides direct path-based ownership, making security rules extremely simple: `allow read, update, delete: if request.auth.uid == volunteerId;`. For the matching system to function, these profiles must be queryable by other authenticated users, but their modification is restricted to the owner.\n    *   **Authorization Independence:** Achieved inherently as the document's ID is the authorization key. No `get()` calls are needed to determine ownership.\n    *   **QAPs (Queryable Authorization Patterns):** Supports querying all profiles by the matching system (which may have elevated privileges or simply iterate over publicly readable (by authenticated users) data) or specific profiles by `volunteerId`.\n\n2.  **Tasks (`/tasks/{taskId}`):**\n    *   **Justification:** Tasks are intended to be broadly visible for volunteers and the dashboard ("
+  }
+}

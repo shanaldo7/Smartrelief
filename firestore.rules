@@ -1,0 +1,123 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * VOLUNTEER MATCHING SYSTEM - SECURITY POSTURE
+     * 
+     * Core Philosophy:
+     * This ruleset implements a hybrid security model designed for a community-driven volunteer platform. 
+     * It prioritizes discoverability for matching while maintaining strict ownership for personal 
+     * and operational data. 
+     *
+     * Data Structure:
+     * - /volunteerProfiles: User profiles keyed by Firebase Auth UID.
+     * - /tasks: Community needs/tasks with designated 'ownerId' for management.
+     * - /matches: Relational documents pairing volunteers to tasks, utilizing denormalized 
+     *   IDs to ensure performant, independent authorization.
+     * - /admins: A DBAC (Database Access Control) collection where existence of a 
+     *   UID grants elevated privileges.
+     *
+     * Key Security Decisions:
+     * 1. Discovery-First Reads: Tasks and Volunteer Profiles are listable by any authenticated 
+     *    user to facilitate the matching engine and dashboard.
+     * 2. Strict Ownership: Writing/Deleting profiles and tasks is strictly limited to 
+     *    the resource creator.
+     * 3. Authorization Independence: Match documents store both the volunteerId and 
+     *    taskOwnerId. This allows the rules to verify access without performing costly 
+     *    get() lookups on parent documents.
+     * 4. Admin Override: A global isAdmin() helper allows administrative accounts 
+     *    (defined in the /admins collection) to manage data imports and system-wide cleanup.
+     */
+
+    // --- Helper Functions ---
+
+    /** @description Checks if the user is authenticated. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** @description Checks if the user's UID matches the provided ID. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Checks if the user is an owner of an existing document. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    /** @description Checks if the user is a registered administrator. */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    /** @description Validates ownership based on a field within the document data. */
+    function isDataOwner(field) {
+      return isSignedIn() && request.resource.data[field] == request.auth.uid;
+    }
+    
+    /** @description Validates ownership against an existing document's data field. */
+    function isExistingDataOwner(field) {
+      return resource != null && isSignedIn() && resource.data[field] == request.auth.uid;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for Volunteer Profiles. Owners can manage their data; all users can view for matching.
+     * @path /volunteerProfiles/{volunteerId}
+     * @allow (get/list) signed-in users viewing profiles.
+     * @allow (create) users creating their own profile where UID matches document ID.
+     * @deny (write) users attempting to modify a profile they do not own.
+     * @principle Ownership-based write access with authenticated public read.
+     */
+    match /volunteerProfiles/{volunteerId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(volunteerId) && request.resource.data.id == volunteerId;
+      allow update, delete: if isExistingOwner(volunteerId);
+    }
+
+    /**
+     * @description Rules for Tasks. Tasks are visible to all for the dashboard, but manageable only by creators.
+     * @path /tasks/{taskId}
+     * @allow (create) signed-in user setting themselves as the 'ownerId'.
+     * @allow (update/delete) the original task creator.
+     * @deny (create) providing an 'ownerId' that does not match the authenticated UID.
+     * @principle Relational integrity enforced by matching ownerId to the auth context.
+     */
+    match /tasks/{taskId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && isDataOwner('ownerId') && request.resource.data.id == taskId;
+      allow update, delete: if isExistingDataOwner('ownerId') || isAdmin();
+    }
+
+    /**
+     * @description Rules for Matches. Restricted to the involved volunteer, the task owner, or admins.
+     * @path /matches/{matchId}
+     * @allow (get/list) if the user is the volunteerId or the taskOwnerId stored on the match.
+     * @allow (update) if the user is the volunteer (e.g., accepting a match) or an admin.
+     * @deny (get) users not directly involved in the match.
+     * @principle Authorization Independence using denormalized ID fields.
+     */
+    match /matches/{matchId} {
+      allow get, list: if isSignedIn() && (resource.data.volunteerId == request.auth.uid || resource.data.taskOwnerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (isDataOwner('volunteerId') || isAdmin());
+      allow update: if resource != null && (resource.data.volunteerId == request.auth.uid || isAdmin());
+      allow delete: if resource != null && (resource.data.taskOwnerId == request.auth.uid || isAdmin());
+    }
+
+    /**
+     * @description DBAC collection for global admin privileges.
+     * @path /admins/{adminId}
+     * @allow (get) a user checking their own admin status.
+     * @deny (list/write) any client-side modification; admins should be managed via console/functions.
+     * @principle Locked-down administrative registry.
+     */
+    match /admins/{adminId} {
+      allow get: if isOwner(adminId);
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+  }
+}
