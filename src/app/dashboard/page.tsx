@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react";
@@ -8,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map as MapIcon, CheckCircle, Crosshair, Plus, Minus, Navigation, X, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
@@ -143,6 +144,13 @@ export default function Dashboard() {
       if (task && task.latitude) {
         setMapCenter([task.latitude, task.longitude]);
         setMapZoom(14);
+        if (!userLocation) {
+          toast({ 
+            title: "Task Selected", 
+            description: "Detect your location to see the tactical response route.",
+            variant: "default"
+          });
+        }
       }
     }
   };
@@ -326,7 +334,7 @@ export default function Dashboard() {
               disabled={isImporting}
             >
               <Database className="h-4 w-4" />
-              {isImporting ? "Fetching..." : "Fetch NGO Data"}
+              {isImporting ? "Fetch NGO Data" : "Fetch NGO Data"}
             </Button>
             <div className="flex h-10 items-center gap-4 bg-card px-4 rounded-xl shadow-sm border">
                <div className="flex items-center gap-1.5 border-r pr-4">
@@ -359,7 +367,7 @@ export default function Dashboard() {
                 {selectedTaskId && userLocation && (
                    <div className="bg-primary text-primary-foreground px-4 py-2 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right-4">
                      <div className="flex flex-col">
-                       <span className="text-[10px] uppercase font-bold opacity-80">Tactical Route</span>
+                       <span className="text-[10px] uppercase font-bold opacity-80">Tactical Route Active</span>
                        <span className="text-xs font-bold truncate max-w-[150px]">
                          {activeTasksForMap.find(t => t.id === selectedTaskId)?.title}
                        </span>
@@ -385,9 +393,17 @@ export default function Dashboard() {
                     <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white" /> Low Urgency
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-purple-500 border border-white" /> You
+                    <div className="w-3 h-3 rounded-full bg-purple-500 border border-white" /> You (Responder)
                   </div>
                 </div>
+              </div>
+              <div className="absolute bottom-4 left-4 z-[1000] flex gap-2">
+                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-lg" onClick={() => setMapZoom(prev => Math.min(prev + 1, 18))}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-lg" onClick={() => setMapZoom(prev => Math.max(prev - 1, 3))}>
+                  <Minus className="h-4 w-4" />
+                </Button>
               </div>
             </Card>
 
@@ -445,7 +461,7 @@ export default function Dashboard() {
                      <Card 
                        key={task.id} 
                        className={cn(
-                         "border-none shadow-sm bg-card relative transition-all", 
+                         "border-none shadow-sm bg-card relative transition-all hover:shadow-md", 
                          task.status === 'completed' && "opacity-60",
                          selectedTaskId === task.id && "ring-2 ring-primary"
                        )}
@@ -475,10 +491,10 @@ export default function Dashboard() {
                          <Button 
                            variant={selectedTaskId === task.id ? "default" : "outline"} 
                            size="sm" 
-                           className="text-xs" 
+                           className="flex-1 text-xs gap-2" 
                            onClick={() => handleTaskSelect(task.id)}
                          >
-                           <MapIcon className="h-3 w-3" /> View Route
+                           <Route className="h-3 w-3" /> Tactical Route
                          </Button>
                        </CardFooter>
                      </Card>
@@ -505,7 +521,7 @@ export default function Dashboard() {
                        </CardContent>
                        <CardFooter className="pt-0">
                          <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => { setMapCenter([volunteer.latitude, volunteer.longitude]); setMapZoom(15); }}>
-                           <MapIcon className="h-3 w-3 mr-2" /> Locate
+                           <MapIcon className="h-3 w-3 mr-2" /> Locate Rescuer
                          </Button>
                        </CardFooter>
                      </Card>
@@ -582,7 +598,7 @@ export default function Dashboard() {
                   </div>
                   {selectedTaskId && userLocation && (
                     <div className="p-3 bg-primary/10 rounded-lg border-l-4 border-primary shadow-sm text-[11px] leading-relaxed animate-pulse">
-                      A tactical route has been calculated to the target destination. Follow the dashed line on your tactical overlay.
+                      Tactical overlay is rendering the direct impact route to {activeTasksForMap.find(t => t.id === selectedTaskId)?.title}. Follow the dash indicators.
                     </div>
                   )}
                </CardContent>

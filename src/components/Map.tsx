@@ -1,6 +1,7 @@
+
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet"
 
 const urgencyColors = {
@@ -37,10 +38,12 @@ const MapPinIcon = () => (
   </svg>
 );
 
-function ChangeView({ center, zoom }: { center: [number, number], zoom: number }) {
+function ChangeView({ center, zoom, routeBounds }: { center: [number, number], zoom: number, routeBounds?: any }) {
   const map = useMap();
   useEffect(() => {
-    if (
+    if (routeBounds) {
+      map.fitBounds(routeBounds, { padding: [100, 100], animate: true });
+    } else if (
       map && 
       Array.isArray(center) && 
       center.length === 2 && 
@@ -51,7 +54,7 @@ function ChangeView({ center, zoom }: { center: [number, number], zoom: number }
     ) {
       map.setView(center, zoom);
     }
-  }, [center, zoom, map]);
+  }, [center, zoom, map, routeBounds]);
   return null;
 }
 
@@ -98,7 +101,16 @@ export default function InteractiveMap({
   }, []);
 
   // Find the selected task to draw the route
-  const selectedTask = tasks.find(t => t.id === selectedTaskId);
+  const selectedTask = useMemo(() => tasks.find(t => t.id === selectedTaskId), [tasks, selectedTaskId]);
+
+  // Calculate bounds if route is active
+  const routeBounds = useMemo(() => {
+    if (!L || !userLocation || !selectedTask || !selectedTask.latitude) return null;
+    return L.latLngBounds([
+      userLocation,
+      [selectedTask.latitude, selectedTask.longitude]
+    ]);
+  }, [L, userLocation, selectedTask]);
 
   if (!isMounted || !L || Object.keys(icons).length === 0) {
     return (
@@ -112,7 +124,7 @@ export default function InteractiveMap({
   }
 
   return (
-    <div id="map-container" className="h-[450px] w-full relative overflow-hidden rounded-xl bg-muted border">
+    <div id="map-container" className="h-[450px] w-full relative overflow-hidden rounded-xl bg-muted border shadow-inner">
       <MapContainer 
         id="map"
         center={center} 
@@ -125,17 +137,27 @@ export default function InteractiveMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <ChangeView center={center} zoom={zoom} />
+        <ChangeView center={center} zoom={zoom} routeBounds={routeBounds} />
         
-        {/* Route Line */}
+        {/* Tactical Route Line */}
         {userLocation && selectedTask && selectedTask.latitude && selectedTask.longitude && (
-          <Polyline 
-            positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
-            color="#8b5cf6"
-            dashArray="10, 10"
-            weight={3}
-            opacity={0.8}
-          />
+          <>
+            {/* Outer Glow Line */}
+            <Polyline 
+              positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
+              color="#8b5cf6"
+              weight={8}
+              opacity={0.2}
+            />
+            {/* Main Path Line */}
+            <Polyline 
+              positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
+              color="#8b5cf6"
+              dashArray="8, 12"
+              weight={4}
+              opacity={0.9}
+            />
+          </>
         )}
 
         {/* User Location Marker */}
@@ -143,8 +165,8 @@ export default function InteractiveMap({
           <Marker position={userLocation} icon={icons.user}>
             <Popup>
               <div className="p-1 text-center">
-                <p className="font-bold text-sm text-primary">Your Location</p>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Active Monitoring Area</p>
+                <p className="font-bold text-sm text-primary">Your Tactical Position</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Active Responder</p>
               </div>
             </Popup>
           </Marker>
@@ -163,27 +185,32 @@ export default function InteractiveMap({
               }}
             >
               <Popup>
-                <div className="space-y-1 min-w-[150px] p-1">
-                  <p className="font-bold text-sm leading-tight text-foreground">{task.title}</p>
+                <div className="space-y-1 min-w-[180px] p-1">
+                  <div className="flex justify-between items-start mb-1">
+                    <p className="font-bold text-sm leading-tight text-foreground pr-2">{task.title}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] text-white font-bold uppercase ${
+                      task.urgency === 'high' ? 'bg-red-500' : task.urgency === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}>
+                      {task.urgency}
+                    </span>
+                  </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                      <MapPinIcon /> {task.location}
                   </div>
-                  <div className="flex flex-col gap-1 mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Urgency</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] text-white font-bold uppercase ${
-                        task.urgency === 'high' ? 'bg-red-500' : task.urgency === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}>
-                        {task.urgency}
-                      </span>
+                  
+                  {userLocation ? (
+                    <div className="pt-2 border-t mt-2 flex flex-col gap-2">
+                       <div className="bg-primary/5 p-2 rounded-lg border border-primary/10">
+                         <p className="text-[9px] font-bold text-primary uppercase">Route Calculated</p>
+                         <p className="text-[10px] text-muted-foreground">Follow path to NGO destination.</p>
+                       </div>
+                       <p className="text-[9px] text-center font-bold text-muted-foreground uppercase">Tap marker to refocus path</p>
                     </div>
-                    {userLocation && (
-                      <div className="pt-2 border-t mt-1">
-                         <p className="text-[9px] font-bold text-primary uppercase">Route Active</p>
-                         <p className="text-[10px] text-muted-foreground">Tap to focus on response path.</p>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="pt-2 border-t mt-2">
+                       <p className="text-[10px] text-amber-600 font-bold uppercase italic">Detect location to see route</p>
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
@@ -201,6 +228,11 @@ export default function InteractiveMap({
                 <div className="space-y-1 min-w-[120px] p-1">
                   <p className="font-bold text-sm leading-tight text-foreground">{vol.name}</p>
                   <p className="text-xs text-muted-foreground">{vol.location}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {vol.skills?.slice(0, 2).map((s: string) => (
+                      <span key={s} className="text-[8px] bg-muted px-1 rounded uppercase font-bold">{s}</span>
+                    ))}
+                  </div>
                 </div>
               </Popup>
             </Marker>
@@ -210,9 +242,16 @@ export default function InteractiveMap({
       <style jsx global>{`
         @keyframes ping {
           75%, 100% {
-            transform: scale(2);
+            transform: scale(2.5);
             opacity: 0;
           }
+        }
+        .leaflet-popup-content-wrapper {
+          border-radius: 12px;
+          padding: 4px;
+        }
+        .leaflet-popup-tip {
+          background: white;
         }
       `}</style>
     </div>
