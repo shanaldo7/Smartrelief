@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react";
@@ -54,16 +55,16 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
 
-  // Memoized queries
+  // Memoized queries - now dependent on user to avoid race conditions with auth
   const tasksQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !user) return null;
     return query(collection(db, "tasks"), orderBy("priority", "desc"), orderBy("createdAt", "desc"));
-  }, [db]);
+  }, [db, user]);
 
   const volunteersQuery = useMemoFirebase(() => {
-    if (!db) return null;
+    if (!db || !user) return null;
     return query(collection(db, "volunteerProfiles"), orderBy("createdAt", "desc"));
-  }, [db]);
+  }, [db, user]);
 
   const { data: tasks = [] } = useCollection<Task>(tasksQuery);
   const { data: volunteers = [] } = useCollection<Volunteer>(volunteersQuery);
