@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react";
@@ -8,9 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, query, serverTimestamp, doc } from "firebase/firestore";
-import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2 } from "lucide-react";
+import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 
 interface Task {
   id: string;
@@ -48,15 +56,24 @@ const SAMPLE_NGO_DATA = [
   { title: "Logistics Coordinator", description: "Coordinating truck arrivals and inventory of water supplies.", skillsRequired: ["Admin", "Tech Support"], location: "East Port", urgency: "medium", priority: 2, status: "open", submittedBy: "Food Bank" },
   { title: "Tech Support for Ops Center", description: "Maintaining internet and radio comms for rescue teams.", skillsRequired: ["Tech Support"], location: "Command Center", urgency: "medium", priority: 2, status: "open", submittedBy: "Response Corps" },
   { title: "Neighborhood Cleanup", description: "Clearing debris from local roads to allow emergency access.", skillsRequired: ["General Labor", "Driving"], location: "West Hills", urgency: "low", priority: 1, status: "open", submittedBy: "City Council" },
+  { title: "Water Distribution", description: "Delivering clean water to families in cut-off areas.", skillsRequired: ["Driving", "General Labor"], location: "Riverside", urgency: "high", priority: 3, status: "open", submittedBy: "WaterAid" },
+  { title: "Mental Health Support", description: "Providing counseling for families affected by the disaster.", skillsRequired: ["Healthcare"], location: "Downtown", urgency: "medium", priority: 2, status: "open", submittedBy: "Unity Care" },
 ];
+
+const chartConfig = {
+  tasks: {
+    label: "Active Needs",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
 
 export default function Dashboard() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
-  // Simplified queries to avoid missing index errors (handled via in-memory sorting)
   const tasksQuery = useMemoFirebase(() => {
     if (!db || !user || isUserLoading) return null;
     return collection(db, "tasks");
@@ -70,18 +87,20 @@ export default function Dashboard() {
   const { data: rawTasks, isLoading: tasksLoading } = useCollection<Task>(tasksQuery);
   const { data: rawVolunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
 
-  // Sort tasks in memory: priority (desc), then createdAt (desc)
-  const sortedTasks = useMemo(() => {
+  const filteredTasks = useMemo(() => {
     if (!rawTasks) return [];
-    return [...rawTasks].sort((a, b) => {
+    let filtered = [...rawTasks];
+    if (locationFilter !== "all") {
+      filtered = filtered.filter(t => t.location === locationFilter);
+    }
+    return filtered.sort((a, b) => {
       if (b.priority !== a.priority) return b.priority - a.priority;
       const dateA = a.createdAt?.toMillis?.() || 0;
       const dateB = b.createdAt?.toMillis?.() || 0;
       return dateB - dateA;
     });
-  }, [rawTasks]);
+  }, [rawTasks, locationFilter]);
 
-  // Sort volunteers in memory: createdAt (desc)
   const sortedVolunteers = useMemo(() => {
     if (!rawVolunteers) return [];
     return [...rawVolunteers].sort((a, b) => {
@@ -91,12 +110,21 @@ export default function Dashboard() {
     });
   }, [rawVolunteers]);
 
-  // Calculate matches dynamically based on data
+  const areaImpact = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rawTasks?.forEach(t => {
+      counts[t.location] = (counts[t.location] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, tasks: count }))
+      .sort((a, b) => b.tasks - a.tasks);
+  }, [rawTasks]);
+
   const matches = useMemo(() => {
-    if (!sortedTasks || !sortedVolunteers) return [];
+    if (!rawTasks || !sortedVolunteers) return [];
     
     const results: Match[] = [];
-    sortedTasks.filter(t => t.status === 'open').forEach(task => {
+    rawTasks.filter(t => t.status === 'open').forEach(task => {
       sortedVolunteers.forEach(volunteer => {
         let score = 0;
         const reasons: string[] = [];
@@ -105,20 +133,20 @@ export default function Dashboard() {
           volunteer.skills.some(vSkill => vSkill.toLowerCase() === skill.toLowerCase())
         );
         if (matchedSkills.length > 0) {
-          score += matchedSkills.length * 15;
+          score += matchedSkills.length * 20;
           reasons.push(`${matchedSkills.length} skills matched`);
         }
 
         if (task.location.toLowerCase() === volunteer.location.toLowerCase()) {
-          score += 25;
-          reasons.push("Local volunteer");
+          score += 40;
+          reasons.push("Geographic Proximity");
         }
 
         if (score > 0) {
           results.push({
             taskId: task.id,
             volunteerId: volunteer.id,
-            score: score + (task.priority * 10),
+            score: score + (task.priority * 15),
             reasons,
             taskTitle: task.title,
             volunteerName: volunteer.name
@@ -128,21 +156,10 @@ export default function Dashboard() {
     });
 
     return results.sort((a, b) => b.score - a.score);
-  }, [sortedTasks, sortedVolunteers]);
-
-  const areaImpact = useMemo(() => {
-    const counts: Record<string, number> = {};
-    sortedTasks.forEach(t => {
-      counts[t.location] = (counts[t.location] || 0) + 1;
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [sortedTasks]);
+  }, [rawTasks, sortedVolunteers]);
 
   const handleImportData = async () => {
-    if (!db || !user) {
-      toast({ variant: "destructive", title: "Wait a moment", description: "We are initializing your session." });
-      return;
-    }
+    if (!db || !user) return;
     setIsImporting(true);
     try {
       for (const item of SAMPLE_NGO_DATA) {
@@ -157,10 +174,10 @@ export default function Dashboard() {
       }
       toast({
         title: "NGO Data Imported",
-        description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks.`,
+        description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks across ${new Set(SAMPLE_NGO_DATA.map(d => d.location)).size} locations.`,
       });
     } catch (error) {
-      // Handled by global listener
+      // Handled globally
     } finally {
       setIsImporting(false);
     }
@@ -194,13 +211,13 @@ export default function Dashboard() {
               disabled={isImporting}
             >
               <Database className="h-4 w-4" />
-              {isImporting ? "Importing..." : "Import NGO Data"}
+              {isImporting ? "Importing..." : "Sync Regional Data"}
             </Button>
             <div className="flex h-10 items-center gap-4 bg-card px-4 rounded-xl shadow-sm border">
                <div className="flex items-center gap-1.5 border-r pr-4">
                  <Activity className="h-4 w-4 text-primary" />
-                 <span className="text-sm font-bold">{sortedTasks.length}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-semibold">Needs</span>
+                 <span className="text-sm font-bold">{rawTasks?.length || 0}</span>
+                 <span className="text-[10px] text-muted-foreground uppercase font-semibold">Total Needs</span>
                </div>
                <div className="flex items-center gap-1.5">
                  <Users className="h-4 w-4 text-accent" />
@@ -212,39 +229,102 @@ export default function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
-           <Card className="lg:col-span-1 shadow-sm border-none bg-primary/5">
-             <CardHeader>
-               <CardTitle className="text-sm font-bold flex items-center gap-2">
-                 <AlertTriangle className="h-4 w-4 text-primary" />
-                 Critical Areas
-               </CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className="space-y-4">
-                 {areaImpact.length > 0 ? areaImpact.map(([area, count]) => (
-                   <div key={area} className="flex justify-between items-center">
-                     <span className="text-sm font-medium">{area}</span>
-                     <Badge variant="secondary" className="font-mono">{count} tasks</Badge>
-                   </div>
-                 )) : (
-                   <p className="text-xs text-muted-foreground">No area data available.</p>
+          {/* Geospatial Focus Sidebar */}
+          <aside className="lg:col-span-1 space-y-6">
+            <Card className="shadow-sm border-none bg-primary/5 overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Map className="h-4 w-4 text-primary" />
+                  Impact Density
+                </CardTitle>
+                <CardDescription className="text-[10px]">Active needs per region</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -20 }}>
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      tickLine={false} 
+                      axisLine={false}
+                      className="text-[10px] font-bold"
+                    />
+                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                    <Bar dataKey="tasks" radius={4}>
+                      {areaImpact.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+                
+                <div className="mt-6 space-y-2">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-3">Regional Explorer</p>
+                  <Button 
+                    variant={locationFilter === 'all' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start text-xs h-8"
+                    onClick={() => setLocationFilter('all')}
+                  >
+                    <Activity className="h-3 w-3 mr-2" /> Global View
+                  </Button>
+                  {areaImpact.map((area) => (
+                    <Button 
+                      key={area.name}
+                      variant={locationFilter === area.name ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      className="w-full justify-between text-xs h-8"
+                      onClick={() => setLocationFilter(area.name)}
+                    >
+                      <span className="flex items-center">
+                        <MapPin className="h-3 w-3 mr-2" /> {area.name}
+                      </span>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">{area.tasks}</Badge>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm bg-accent/5">
+               <CardHeader className="pb-2">
+                 <CardTitle className="text-xs font-bold uppercase text-accent">Active Alerts</CardTitle>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                  {areaImpact[0] && (
+                    <div className="flex items-start gap-3 p-3 bg-white rounded-lg border-l-4 border-red-500 shadow-sm">
+                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold">{areaImpact[0].name} Critical</p>
+                        <p className="text-[10px] text-muted-foreground">High concentration of priority 3 needs detected.</p>
+                      </div>
+                    </div>
+                  )}
+               </CardContent>
+            </Card>
+          </aside>
+
+          {/* Main Content Area */}
+          <div className="lg:col-span-3">
+             <Tabs defaultValue="matches" className="space-y-8">
+               <div className="flex justify-between items-center">
+                 <TabsList className="grid w-full grid-cols-3 max-w-md h-12 bg-muted p-1 rounded-xl">
+                   <TabsTrigger value="matches" className="rounded-lg data-[state=active]:shadow-sm">Smart Matches</TabsTrigger>
+                   <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:shadow-sm">Incident Feed</TabsTrigger>
+                   <TabsTrigger value="volunteers" className="rounded-lg data-[state=active]:shadow-sm">Rescuers</TabsTrigger>
+                 </TabsList>
+                 {locationFilter !== 'all' && (
+                   <Badge variant="secondary" className="gap-1 animate-in fade-in slide-in-from-right-2">
+                     <MapPin className="h-3 w-3" /> Filtering: {locationFilter}
+                   </Badge>
                  )}
                </div>
-             </CardContent>
-           </Card>
-
-           <div className="lg:col-span-3">
-             <Tabs defaultValue="matches" className="space-y-8">
-               <TabsList className="grid w-full grid-cols-3 max-w-md h-12 bg-muted p-1 rounded-xl">
-                 <TabsTrigger value="matches" className="rounded-lg data-[state=active]:shadow-sm">Smart Matches</TabsTrigger>
-                 <TabsTrigger value="tasks" className="rounded-lg data-[state=active]:shadow-sm">Urgent Needs</TabsTrigger>
-                 <TabsTrigger value="volunteers" className="rounded-lg data-[state=active]:shadow-sm">Rescuers</TabsTrigger>
-               </TabsList>
 
                <TabsContent value="matches" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                    {matches.length > 0 ? (
-                     matches.map((match, i) => (
+                     matches.filter(m => locationFilter === 'all' || m.reasons.some(r => r === "Geographic Proximity")).slice(0, 9).map((match, i) => (
                        <Card key={`${match.taskId}-${match.volunteerId}`} className="relative border-none shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 bg-card group">
                          <div className="absolute top-0 right-0 p-4">
                            <div className="bg-primary/10 text-primary text-[10px] font-bold uppercase px-3 py-1 rounded-full flex items-center gap-1.5">
@@ -253,9 +333,9 @@ export default function Dashboard() {
                          </div>
                          <CardHeader className="pb-2">
                            <CardTitle className="text-lg flex items-center gap-2 font-bold">
-                             Recommendation
+                             Match Recommendation
                            </CardTitle>
-                           <CardDescription>Volunteer to task pairing</CardDescription>
+                           <CardDescription>Strategic pairing</CardDescription>
                          </CardHeader>
                          <CardContent className="space-y-4">
                            <div className="p-3 bg-muted/30 rounded-xl">
@@ -268,7 +348,10 @@ export default function Dashboard() {
                            </div>
                            <div className="flex flex-wrap gap-2 pt-2">
                              {match.reasons.map((r, idx) => (
-                               <Badge key={idx} variant="outline" className="text-[10px] bg-white/50 border-primary/20">
+                               <Badge key={idx} variant="outline" className={cn(
+                                 "text-[10px] bg-white/50",
+                                 r === "Geographic Proximity" ? "border-accent text-accent font-bold" : "border-primary/20"
+                               )}>
                                  {r}
                                </Badge>
                              ))}
@@ -288,7 +371,7 @@ export default function Dashboard() {
 
                <TabsContent value="tasks" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {sortedTasks.map(task => (
+                   {filteredTasks.map(task => (
                      <Card key={task.id} className="border-none shadow-sm hover:shadow-md transition-shadow bg-card">
                        <CardHeader className="pb-2">
                          <div className="flex justify-between items-start mb-3">
@@ -318,12 +401,17 @@ export default function Dashboard() {
                        </CardContent>
                      </Card>
                    ))}
+                   {filteredTasks.length === 0 && (
+                     <div className="col-span-full py-20 text-center text-muted-foreground">
+                       No tasks found in {locationFilter}.
+                     </div>
+                   )}
                  </div>
                </TabsContent>
 
                <TabsContent value="volunteers" className="space-y-6">
                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                   {sortedVolunteers.map(volunteer => (
+                   {sortedVolunteers.filter(v => locationFilter === 'all' || v.location === locationFilter).map(volunteer => (
                      <Card key={volunteer.id} className="border-none shadow-sm bg-card">
                        <CardHeader className="pb-2">
                          <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold mb-3">
@@ -348,7 +436,7 @@ export default function Dashboard() {
                  </div>
                </TabsContent>
              </Tabs>
-           </div>
+          </div>
         </div>
       </main>
     </div>
