@@ -6,8 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
-import { collection, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
+import { collection, query, orderBy, serverTimestamp, doc } from "firebase/firestore";
 import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ interface Task {
   priority: number;
   skillsRequired: string[];
   status: string;
+  ownerId: string;
 }
 
 interface Volunteer {
@@ -49,6 +50,7 @@ const SAMPLE_NGO_DATA = [
 
 export default function Dashboard() {
   const db = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
 
@@ -60,7 +62,7 @@ export default function Dashboard() {
 
   const volunteersQuery = useMemoFirebase(() => {
     if (!db) return null;
-    return query(collection(db, "volunteers"), orderBy("createdAt", "desc"));
+    return query(collection(db, "volunteerProfiles"), orderBy("createdAt", "desc"));
   }, [db]);
 
   const { data: tasks = [] } = useCollection<Task>(tasksQuery);
@@ -107,7 +109,6 @@ export default function Dashboard() {
     return results.sort((a, b) => b.score - a.score);
   }, [tasks, volunteers]);
 
-  // Analytics: Most Affected Areas (Areas with most tasks)
   const areaImpact = useMemo(() => {
     const counts: Record<string, number> = {};
     tasks?.forEach(t => {
@@ -117,22 +118,28 @@ export default function Dashboard() {
   }, [tasks]);
 
   const handleImportData = async () => {
-    if (!db) return;
+    if (!db || !user) {
+      toast({ variant: "destructive", title: "Wait a moment", description: "We are initializing your session." });
+      return;
+    }
     setIsImporting(true);
     try {
       for (const item of SAMPLE_NGO_DATA) {
-        addDocumentNonBlocking(collection(db, "tasks"), {
+        const taskRef = doc(collection(db, "tasks"));
+        setDocumentNonBlocking(taskRef, {
           ...item,
+          id: taskRef.id,
+          ownerId: user.uid,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
       }
       toast({
         title: "NGO Data Imported",
         description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks into Firestore.`,
       });
     } catch (error) {
-      toast({ variant: "destructive", title: "Import Failed", description: "Failed to load sample data." });
+      // Errors handled by FirebaseErrorListener
     } finally {
       setIsImporting(false);
     }

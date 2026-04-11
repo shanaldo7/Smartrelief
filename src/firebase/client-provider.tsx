@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, type ReactNode } from 'react';
+import React, { useMemo, useEffect, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -10,9 +11,20 @@ interface FirebaseClientProviderProps {
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const firebaseServices = useMemo(() => {
-    // Initialize Firebase on the client side, once per component mount.
     return initializeFirebase();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
+
+  useEffect(() => {
+    const { auth } = firebaseServices;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth).catch((error) => {
+          console.error("Anonymous sign-in failed", error);
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [firebaseServices]);
 
   return (
     <FirebaseProvider

@@ -9,13 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClipboardList, Sparkles, AlertCircle } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { smartTaskDescriptionAssistant } from "@/ai/flows/smart-task-description-assistant";
 
 export default function NewTask() {
+  const db = useFirestore();
+  const { user } = useUser();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -37,8 +39,7 @@ export default function NewTask() {
       setDescription(result.enhancedTaskDescription);
       toast({ title: "Enhanced!", description: "AI has updated your task description to be more engaging." });
     } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to enhance description." });
+      // Error handled by FirebaseErrorListener
     } finally {
       setIsEnhancing(false);
     }
@@ -46,17 +47,22 @@ export default function NewTask() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!db || !user) {
+      toast({ variant: "destructive", title: "Wait a moment", description: "Your session is initializing." });
+      return;
+    }
     if (!title || !description || !location || !skillsRequired) {
       toast({ variant: "destructive", title: "Missing fields", description: "Please fill in all details." });
       return;
     }
 
     setLoading(true);
-    // Priority: high = 3, medium = 2, low = 1
     const priority = urgency === "high" ? 3 : urgency === "medium" ? 2 : 1;
 
     try {
-      await addDoc(collection(db, "tasks"), {
+      const taskRef = doc(collection(db, "tasks"));
+      setDocumentNonBlocking(taskRef, {
+        id: taskRef.id,
         title,
         description,
         location,
@@ -64,13 +70,16 @@ export default function NewTask() {
         priority,
         skillsRequired: skillsRequired.split(",").map(s => s.trim()).filter(s => s !== ""),
         status: "open",
-        createdAt: serverTimestamp()
-      });
+        ownerId: user.uid,
+        submittedBy: user.displayName || "Community Member",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      
       toast({ title: "Success!", description: "Your task has been posted." });
       router.push("/dashboard");
     } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to post task." });
+      // Error handled by FirebaseErrorListener
     } finally {
       setLoading(false);
     }

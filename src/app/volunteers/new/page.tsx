@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UserPlus, CheckCircle2 } from "lucide-react";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, setDocumentNonBlocking } from "@/firebase";
+import { doc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +18,8 @@ const SKILLS = [
 ];
 
 export default function NewVolunteer() {
+  const db = useFirestore();
+  const { user } = useUser();
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
@@ -33,6 +35,10 @@ export default function NewVolunteer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!db || !user) {
+      toast({ variant: "destructive", title: "Wait a moment", description: "Your session is initializing." });
+      return;
+    }
     if (!name || !location || selectedSkills.length === 0) {
       toast({ variant: "destructive", title: "Missing fields", description: "Please fill in all details." });
       return;
@@ -40,17 +46,21 @@ export default function NewVolunteer() {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, "volunteers"), {
+      const profileRef = doc(db, "volunteerProfiles", user.uid);
+      setDocumentNonBlocking(profileRef, {
+        id: user.uid,
         name,
+        email: user.email || "",
         location,
         skills: selectedSkills,
-        createdAt: serverTimestamp()
-      });
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       toast({ title: "Success!", description: "Your volunteer profile has been created." });
       router.push("/dashboard");
     } catch (error) {
-      console.error(error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save profile." });
+      // Error handled by FirebaseErrorListener
     } finally {
       setLoading(false);
     }
