@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import Image from "next/image";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   const heroImage = PlaceHolderImages.find(img => img.id === 'hero');
@@ -107,11 +108,8 @@ export default function Home() {
             <Link href="/tasks/new" className="hover:text-primary transition-colors">NGO Portal</Link>
             <Link href="/volunteers/new" className="hover:text-primary transition-colors">Volunteer Center</Link>
           </div>
-          <p className="text-sm text-muted-foreground">© 2024 SmartRelief. Humanitarian Data Platform.</p>
         </div>
       </footer>
     </div>
   );
 }
-
-import { Badge } from "@/components/ui/badge";
