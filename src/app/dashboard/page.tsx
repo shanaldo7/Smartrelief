@@ -133,6 +133,26 @@ export default function Dashboard() {
       .sort((a, b) => b.tasks - a.tasks);
   }, [rawTasks]);
 
+  const handleRegionClick = (regionName: string) => {
+    setLocationFilter(regionName);
+    if (regionName === 'all') {
+      setMapCenter([20.5937, 78.9629]);
+      setMapZoom(5);
+      return;
+    }
+
+    // Find the first task in this region to get coordinates
+    const regionalTask = rawTasks?.find(t => t.location === regionName);
+    if (regionalTask && regionalTask.latitude && regionalTask.longitude) {
+      setMapCenter([regionalTask.latitude, regionalTask.longitude]);
+      setMapZoom(12);
+      toast({ 
+        title: "Focusing Region", 
+        description: `Map centered on ${regionName}.` 
+      });
+    }
+  };
+
   const matches = useMemo(() => {
     if (!rawTasks || !sortedVolunteers) return [];
     
@@ -450,11 +470,22 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="pt-4">
                 <ChartContainer config={chartConfig} className="h-[180px] w-full">
-                  <BarChart data={areaImpact} layout="vertical" margin={{ left: -20 }}>
+                  <BarChart 
+                    data={areaImpact} 
+                    layout="vertical" 
+                    margin={{ left: -20 }}
+                  >
                     <XAxis type="number" hide />
                     <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} className="text-[10px] font-bold" />
                     <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                    <Bar dataKey="tasks" radius={4}>
+                    <Bar 
+                      dataKey="tasks" 
+                      radius={4}
+                      className="cursor-pointer"
+                      onClick={(data) => {
+                        if (data && data.name) handleRegionClick(data.name);
+                      }}
+                    >
                       {areaImpact.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={index === 0 ? "hsl(var(--primary))" : "hsl(var(--primary) / 0.4)"} />
                       ))}
@@ -463,11 +494,22 @@ export default function Dashboard() {
                 </ChartContainer>
                 
                 <div className="mt-6 space-y-1">
-                  <Button variant={locationFilter === 'all' ? 'default' : 'ghost'} size="sm" className="w-full justify-start text-xs h-8" onClick={() => setLocationFilter('all')}>
+                  <Button 
+                    variant={locationFilter === 'all' ? 'default' : 'ghost'} 
+                    size="sm" 
+                    className="w-full justify-start text-xs h-8" 
+                    onClick={() => handleRegionClick('all')}
+                  >
                     <Activity className="h-3 w-3 mr-2" /> Global Perspective
                   </Button>
                   {areaImpact.map((area) => (
-                    <Button key={area.name} variant={locationFilter === area.name ? 'secondary' : 'ghost'} size="sm" className="w-full justify-between text-xs h-8" onClick={() => setLocationFilter(area.name)}>
+                    <Button 
+                      key={area.name} 
+                      variant={locationFilter === area.name ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      className="w-full justify-between text-xs h-8" 
+                      onClick={() => handleRegionClick(area.name)}
+                    >
                       <span className="flex items-center"><MapPin className="h-3 w-3 mr-2" /> {area.name}</span>
                       <Badge variant="outline" className="text-[9px] h-4 px-1">{area.tasks}</Badge>
                     </Button>
