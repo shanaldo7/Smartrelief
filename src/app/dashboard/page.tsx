@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, useUser } from "@/firebase";
-import { collection, query, serverTimestamp, doc } from "firebase/firestore";
+import { collection, serverTimestamp, doc } from "firebase/firestore";
 import { MapPin, Users, ClipboardList, CheckCircle2, Zap, AlertTriangle, Database, Activity, Loader2, BarChart3, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +58,8 @@ const SAMPLE_NGO_DATA = [
   { title: "Neighborhood Cleanup", description: "Clearing debris from local roads to allow emergency access.", skillsRequired: ["General Labor", "Driving"], location: "West Hills", urgency: "low", priority: 1, status: "open", submittedBy: "City Council" },
   { title: "Water Distribution", description: "Delivering clean water to families in cut-off areas.", skillsRequired: ["Driving", "General Labor"], location: "Riverside", urgency: "high", priority: 3, status: "open", submittedBy: "WaterAid" },
   { title: "Mental Health Support", description: "Providing counseling for families affected by the disaster.", skillsRequired: ["Healthcare"], location: "Downtown", urgency: "medium", priority: 2, status: "open", submittedBy: "Unity Care" },
+  { title: "Emergency Kitchen Help", description: "Preparing hot meals for displaced residents.", skillsRequired: ["Cooking", "General Labor"], location: "East Port", urgency: "high", priority: 3, status: "open", submittedBy: "Relief Food" },
+  { title: "Satellite Link Setup", description: "Installing temporary communication hubs in remote areas.", skillsRequired: ["Tech Support"], location: "West Hills", urgency: "medium", priority: 2, status: "open", submittedBy: "CommAid" },
 ];
 
 const chartConfig = {
@@ -158,7 +160,7 @@ export default function Dashboard() {
     return results.sort((a, b) => b.score - a.score);
   }, [rawTasks, sortedVolunteers]);
 
-  const handleImportData = async () => {
+  const handleFetchNGOData = async () => {
     if (!db || !user) return;
     setIsImporting(true);
     try {
@@ -173,8 +175,8 @@ export default function Dashboard() {
         }, { merge: true });
       }
       toast({
-        title: "NGO Data Imported",
-        description: `Successfully loaded ${SAMPLE_NGO_DATA.length} sample tasks across ${new Set(SAMPLE_NGO_DATA.map(d => d.location)).size} locations.`,
+        title: "NGO Data Synchronized",
+        description: `Successfully imported ${SAMPLE_NGO_DATA.length} humanitarian tasks.`,
       });
     } catch (error) {
       // Handled globally
@@ -205,37 +207,36 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Button 
-              variant="outline" 
-              className="bg-card shadow-sm gap-2"
-              onClick={handleImportData}
+              variant="default" 
+              className="shadow-sm gap-2"
+              onClick={handleFetchNGOData}
               disabled={isImporting}
             >
               <Database className="h-4 w-4" />
-              {isImporting ? "Importing..." : "Sync Regional Data"}
+              {isImporting ? "Fetching..." : "Fetch NGO Data"}
             </Button>
             <div className="flex h-10 items-center gap-4 bg-card px-4 rounded-xl shadow-sm border">
                <div className="flex items-center gap-1.5 border-r pr-4">
                  <Activity className="h-4 w-4 text-primary" />
                  <span className="text-sm font-bold">{rawTasks?.length || 0}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-semibold">Total Needs</span>
+                 <span className="text-[10px] text-muted-foreground uppercase font-semibold ml-1">Active Needs</span>
                </div>
                <div className="flex items-center gap-1.5">
                  <Users className="h-4 w-4 text-accent" />
                  <span className="text-sm font-bold">{sortedVolunteers.length}</span>
-                 <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rescuers</span>
+                 <span className="text-[10px] text-muted-foreground uppercase font-semibold ml-1">Rescuers</span>
                </div>
             </div>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
-          {/* Geospatial Focus Sidebar */}
           <aside className="lg:col-span-1 space-y-6">
             <Card className="shadow-sm border-none bg-primary/5 overflow-hidden">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
                   <Map className="h-4 w-4 text-primary" />
-                  Impact Density
+                  Geospatial Focus
                 </CardTitle>
                 <CardDescription className="text-[10px]">Active needs per region</CardDescription>
               </CardHeader>
@@ -289,7 +290,7 @@ export default function Dashboard() {
 
             <Card className="border-none shadow-sm bg-accent/5">
                <CardHeader className="pb-2">
-                 <CardTitle className="text-xs font-bold uppercase text-accent">Active Alerts</CardTitle>
+                 <CardTitle className="text-xs font-bold uppercase text-accent">Strategic Alerts</CardTitle>
                </CardHeader>
                <CardContent className="space-y-4">
                   {areaImpact[0] && (
@@ -297,7 +298,7 @@ export default function Dashboard() {
                       <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs font-bold">{areaImpact[0].name} Critical</p>
-                        <p className="text-[10px] text-muted-foreground">High concentration of priority 3 needs detected.</p>
+                        <p className="text-[10px] text-muted-foreground">Highest concentration of emergency needs detected here.</p>
                       </div>
                     </div>
                   )}
@@ -305,7 +306,6 @@ export default function Dashboard() {
             </Card>
           </aside>
 
-          {/* Main Content Area */}
           <div className="lg:col-span-3">
              <Tabs defaultValue="matches" className="space-y-8">
                <div className="flex justify-between items-center">
@@ -333,7 +333,7 @@ export default function Dashboard() {
                          </div>
                          <CardHeader className="pb-2">
                            <CardTitle className="text-lg flex items-center gap-2 font-bold">
-                             Match Recommendation
+                             Recommendation
                            </CardTitle>
                            <CardDescription>Strategic pairing</CardDescription>
                          </CardHeader>
@@ -381,7 +381,7 @@ export default function Dashboard() {
                              task.urgency === 'medium' ? "bg-amber-500 hover:bg-amber-600" : 
                              "bg-emerald-500 hover:bg-emerald-600"
                            )}>
-                             {task.urgency} Priority
+                             {task.urgency} Urgency
                            </Badge>
                            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-semibold">
                              <MapPin className="h-3.5 w-3.5" /> {task.location}
