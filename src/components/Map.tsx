@@ -3,6 +3,9 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet"
+import { Button } from "@/components/ui/button"
+import { Zap, Map as MapIcon, XCircle, User as UserIconLucide, AlertTriangle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 const urgencyColors = {
   high: "#ef4444",   // Red
@@ -34,6 +37,52 @@ const UserIcon = () => (
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
+
+/**
+ * Custom Heatmap Layer using leaflet.heat
+ */
+function HeatmapLayer({ tasks, active, L }: { tasks: any[], active: boolean, L: any }) {
+  const map = useMap();
+  const heatLayerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!map || !L || !L.heatLayer) return;
+
+    if (active && tasks.length > 0) {
+      const points = tasks
+        .filter(t => t.latitude && t.longitude && t.status !== 'completed')
+        .map(t => [
+          t.latitude, 
+          t.longitude, 
+          t.urgency === 'high' ? 1.0 : t.urgency === 'medium' ? 0.6 : 0.3
+        ]);
+      
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current);
+      }
+
+      heatLayerRef.current = L.heatLayer(points, {
+        radius: 35,
+        blur: 20,
+        maxZoom: 10,
+        gradient: { 0.4: '#3b82f6', 0.65: '#10b981', 1: '#ef4444' }
+      }).addTo(map);
+    } else {
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current);
+        heatLayerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (heatLayerRef.current) {
+        map.removeLayer(heatLayerRef.current);
+      }
+    };
+  }, [map, tasks, active, L]);
+
+  return null;
+}
 
 function ChangeView({ center, zoom, routeBounds }: { center: [number, number], zoom: number, routeBounds?: any }) {
   const map = useMap();
@@ -94,10 +143,13 @@ export default function InteractiveMap({
   const [isMounted, setIsMounted] = useState(false);
   const [icons, setIcons] = useState<Record<string, any>>({});
   const [L, setL] = useState<any>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
 
   useEffect(() => {
     const initLeaflet = async () => {
       const Leaflet = await import('leaflet');
+      // @ts-ignore
+      await import('leaflet.heat');
       setL(Leaflet.default);
 
       const createIcon = (color: string, isUser = false) => {
@@ -164,6 +216,8 @@ export default function InteractiveMap({
         />
         <ChangeView center={center} zoom={zoom} routeBounds={routeBounds} />
         
+        <HeatmapLayer tasks={tasks} active={showHeatmap} L={L} />
+
         {userLocation && selectedTask && selectedTask.latitude && selectedTask.longitude && (
           <>
             <Polyline 
@@ -276,6 +330,23 @@ export default function InteractiveMap({
           )
         ))}
       </MapContainer>
+
+      {/* Floating Tactical Controls */}
+      <div className="absolute bottom-6 left-6 z-[1000] flex flex-col gap-2">
+        <Button 
+          size="sm" 
+          variant={showHeatmap ? "default" : "secondary"} 
+          className={cn(
+            "rounded-full shadow-2xl font-black uppercase text-[9px] px-6 h-10 border-2 border-white/50 backdrop-blur-md transition-all",
+            showHeatmap ? "bg-primary text-white" : "bg-white/80 text-foreground hover:bg-white"
+          )}
+          onClick={() => setShowHeatmap(!showHeatmap)}
+        >
+          <Zap className={cn("h-4 w-4 mr-2", showHeatmap && "animate-pulse")} /> 
+          {showHeatmap ? "Deactivate Heatmap" : "Activate Heatmap"}
+        </Button>
+      </div>
+
       <style jsx global>{`
         @keyframes ping {
           75%, 100% {
