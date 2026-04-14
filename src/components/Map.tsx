@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
@@ -57,7 +58,6 @@ function ChangeView({ center, zoom, routeBounds }: { center: [number, number], z
       !isNaN(center[0]) && 
       !isNaN(center[1])
     ) {
-      // Prevent redundant view setting if the center/zoom is already functionally matched
       if (lastCenter.current && 
           Math.abs(lastCenter.current[0] - center[0]) < 0.0001 && 
           Math.abs(lastCenter.current[1] - center[1]) < 0.0001 &&
@@ -101,11 +101,11 @@ export default function InteractiveMap({
       const createIcon = (color: string, isUser = false) => {
         return new Leaflet.DivIcon({
           className: "custom-div-icon",
-          html: `<div style="background-color: ${color}; width: ${isUser ? '20px' : '16px'}; height: ${isUser ? '20px' : '16px'}; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.4); position: relative;">
-            ${isUser ? '<div style="position: absolute; top: -4px; left: -4px; right: -4px; bottom: -4px; border: 2.5px solid ' + color + '; border-radius: 50%; animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
+          html: `<div style="background-color: ${color}; width: ${isUser ? '22px' : '18px'}; height: ${isUser ? '22px' : '18px'}; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative;">
+            ${isUser ? '<div style="position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border: 3px solid ' + color + '; border-radius: 50%; animation: ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' : ''}
           </div>`,
-          iconSize: [isUser ? 20 : 16, isUser ? 20 : 16],
-          iconAnchor: [isUser ? 10 : 8, isUser ? 10 : 8],
+          iconSize: [isUser ? 22 : 18, isUser ? 22 : 18],
+          iconAnchor: [isUser ? 11 : 9, isUser ? 11 : 9],
         });
       };
 
@@ -137,17 +137,17 @@ export default function InteractiveMap({
 
   if (!isMounted || !L || Object.keys(icons).length === 0) {
     return (
-      <div className="h-full w-full bg-muted animate-pulse rounded-xl flex items-center justify-center text-muted-foreground min-h-[450px]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 animate-spin border-4 border-primary border-t-transparent rounded-full" />
-          <span className="text-xs font-bold uppercase tracking-widest text-primary">Engaging Tactical Satellites...</span>
+      <div className="h-full w-full bg-muted animate-pulse rounded-3xl flex items-center justify-center text-muted-foreground min-h-[450px]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin border-4 border-primary border-t-transparent rounded-full shadow-2xl" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Engaging Orbital Sensors...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div id="map-container" className="h-[450px] w-full relative overflow-hidden rounded-xl bg-muted border shadow-inner">
+    <div id="map-container" className="h-[450px] w-full relative overflow-hidden rounded-3xl bg-muted border shadow-2xl">
       <MapContainer 
         id="map"
         center={center} 
@@ -167,27 +167,28 @@ export default function InteractiveMap({
             <Polyline 
               positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
               color="#a855f7"
-              weight={10}
-              opacity={0.15}
+              weight={12}
+              opacity={0.1}
             />
             <Polyline 
               positions={[userLocation, [selectedTask.latitude, selectedTask.longitude]]}
               color="#a855f7"
-              weight={4}
-              opacity={0.8}
+              weight={5}
+              opacity={0.9}
+              dashArray="1, 10"
             />
           </>
         )}
 
         {userLocation && (
           <Marker position={userLocation} icon={icons.user}>
-            <Popup>
-              <div className="p-2 text-center min-w-[140px]">
-                <div className="flex items-center justify-center gap-2 mb-1">
+            <Popup className="tactical-popup">
+              <div className="p-3 text-center min-w-[160px]">
+                <div className="flex items-center justify-center gap-2 mb-2">
                    <UserIcon />
-                   <p className="font-bold text-sm text-purple-600">Active Responder</p>
+                   <p className="font-black text-xs text-purple-600 uppercase">Active Unit</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold">Your Current Sector</p>
+                <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest">Sector Locked</p>
               </div>
             </Popup>
           </Marker>
@@ -205,30 +206,37 @@ export default function InteractiveMap({
                 },
               }}
             >
-              <Popup>
-                <div className="space-y-2 min-w-[200px] p-1">
+              <Popup className="tactical-popup">
+                <div className="space-y-3 min-w-[220px] p-2">
                   <div className="flex justify-between items-start">
-                    <p className="font-bold text-sm leading-tight text-foreground pr-2">{task.title}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] text-white font-extrabold uppercase ${
+                    <p className="font-black text-sm leading-tight text-foreground pr-3 uppercase">{task.title}</p>
+                    <span className={`px-2 py-0.5 rounded-md text-[8px] text-white font-black uppercase shadow-lg ${
                       task.urgency === 'high' ? 'bg-red-500' : task.urgency === 'medium' ? 'bg-amber-500' : 'bg-emerald-500'
                     }`}>
                       {task.urgency}
                     </span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium">
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-2 font-bold uppercase">
                      <MapPinIcon /> {task.location}
                   </div>
                   
+                  {task.assignedTo && (
+                    <div className="p-2 bg-accent/10 border-2 border-accent/20 rounded-xl">
+                      <p className="text-[8px] font-black text-accent uppercase">Managing NGO: {task.submittedBy}</p>
+                      <p className="text-[9px] font-bold text-foreground uppercase mt-1">Responder: {task.assignedTo}</p>
+                    </div>
+                  )}
+
                   {userLocation ? (
-                    <div className="pt-2 border-t mt-2 flex flex-col gap-2">
-                       <div className="bg-primary/5 p-2 rounded-lg border border-primary/10">
-                         <p className="text-[9px] font-bold text-primary uppercase">Tactical Route Plotted</p>
-                         <p className="text-[10px] text-muted-foreground">Follow path to mission site.</p>
+                    <div className="pt-2 border-t mt-3 flex flex-col gap-2">
+                       <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
+                         <p className="text-[9px] font-black text-primary uppercase">Tactical Pathing Ready</p>
+                         <p className="text-[10px] text-muted-foreground italic">Distance calculated. Navigate to zone.</p>
                        </div>
                     </div>
                   ) : (
-                    <div className="pt-2 border-t mt-2">
-                       <p className="text-[10px] text-amber-600 font-bold uppercase italic">Detect location to render route</p>
+                    <div className="pt-2 border-t mt-3">
+                       <p className="text-[9px] text-amber-600 font-black uppercase italic tracking-wider">Sync GPS for routing</p>
                     </div>
                   )}
                 </div>
@@ -244,18 +252,25 @@ export default function InteractiveMap({
               position={[vol.latitude, vol.longitude]} 
               icon={icons.volunteer}
             >
-              <Popup>
-                <div className="space-y-2 min-w-[150px] p-1">
+              <Popup className="tactical-popup">
+                <div className="space-y-3 min-w-[180px] p-2">
                   <div className="flex flex-col">
-                    <p className="font-bold text-sm leading-tight text-foreground">{vol.name}</p>
-                    <p className="text-[10px] text-blue-500 font-extrabold uppercase">Certified Rescuer</p>
+                    <p className="font-black text-sm leading-tight text-foreground uppercase">{vol.name}</p>
+                    <p className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-1">Verified Responder</p>
                   </div>
-                  <div className="text-[11px] text-muted-foreground font-medium">
-                    Base City: {vol.location}
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
+                  {vol.currentAssignment ? (
+                    <div className="p-2 bg-blue-500/5 border-2 border-blue-500/20 rounded-xl">
+                      <p className="text-[8px] font-black text-blue-600 uppercase">Assigned to: {vol.currentAssignment.ngoName}</p>
+                      <p className="text-[9px] font-bold uppercase mt-1">Role: {vol.currentAssignment.role}</p>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase">
+                      Base: {vol.location}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-1 mt-2">
                     {vol.skills?.slice(0, 3).map((s: string) => (
-                      <span key={s} className="text-[8px] bg-muted px-1.5 py-0.5 rounded-md uppercase font-bold text-muted-foreground border border-muted-foreground/10">{s}</span>
+                      <span key={s} className="text-[8px] bg-muted px-2 py-0.5 rounded-md uppercase font-black text-muted-foreground border">{s}</span>
                     ))}
                   </div>
                 </div>
@@ -267,14 +282,15 @@ export default function InteractiveMap({
       <style jsx global>{`
         @keyframes ping {
           75%, 100% {
-            transform: scale(3);
+            transform: scale(2.5);
             opacity: 0;
           }
         }
         .leaflet-popup-content-wrapper {
-          border-radius: 16px;
+          border-radius: 20px;
           padding: 8px;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+          box-shadow: 0 15px 45px rgba(0,0,0,0.15);
+          border: 1px solid rgba(0,0,0,0.05);
         }
         .leaflet-popup-tip {
           background: white;
@@ -282,6 +298,10 @@ export default function InteractiveMap({
         .custom-div-icon {
           background: none !important;
           border: none !important;
+        }
+        .tactical-popup .leaflet-popup-content {
+          margin: 12px;
+          line-height: 1.4;
         }
       `}</style>
     </div>

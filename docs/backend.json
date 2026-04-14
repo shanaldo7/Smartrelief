@@ -5,190 +5,93 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "VolunteerProfile",
       "type": "object",
-      "description": "Represents a volunteer's profile, including their personal information, skills, and location, used for matching with tasks.",
+      "description": "Represents a volunteer's profile, including their workforce status and current assignments.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the VolunteerProfile entity."
+          "description": "Unique identifier for the volunteer."
         },
         "name": {
           "type": "string",
-          "description": "The full name of the volunteer."
+          "description": "Full name."
         },
         "email": {
           "type": "string",
-          "description": "The volunteer's email address.",
           "format": "email"
         },
         "skills": {
           "type": "array",
-          "description": "A list of key skills the volunteer possesses.",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         },
         "location": {
+          "type": "string"
+        },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "status": {
           "type": "string",
-          "description": "The geographical location of the volunteer."
+          "enum": ["available", "busy"],
+          "description": "Current workforce availability status."
         },
-        "latitude": {
-          "type": "number",
-          "description": "The latitude coordinate for map visualization."
+        "currentAssignment": {
+          "type": "object",
+          "properties": {
+            "ngoId": { "type": "string" },
+            "ngoName": { "type": "string" },
+            "role": { "type": "string" },
+            "taskId": { "type": "string" },
+            "isPaid": { "type": "boolean" },
+            "startTime": { "type": "string", "format": "date-time" },
+            "endTime": { "type": "string", "format": "date-time" }
+          }
         },
-        "longitude": {
-          "type": "number",
-          "description": "The longitude coordinate for map visualization."
-        },
-        "availability": {
-          "type": "string",
-          "description": "General availability of the volunteer (e.g., 'weekends', 'evenings', 'flexible')."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the volunteer profile was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the volunteer profile was last updated.",
-          "format": "date-time"
-        }
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "name",
-        "email",
-        "skills",
-        "location",
-        "latitude",
-        "longitude",
-        "createdAt"
-      ]
+      "required": ["id", "name", "email", "skills", "location", "latitude", "longitude", "status", "createdAt"]
     },
     "Task": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Task",
       "type": "object",
-      "description": "Represents a task or need submitted by an organization or individual, requiring volunteer assistance.",
+      "description": "Represents a mission with workforce details.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Task entity."
-        },
-        "title": {
-          "type": "string",
-          "description": "A concise title for the task."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the help required, potentially enhanced by an AI assistant."
-        },
-        "category": {
-          "type": "string",
-          "enum": ["Food", "Medical", "Teaching", "Logistics", "Admin", "General Support"],
-          "description": "The sector or type of aid required."
-        },
-        "skillsRequired": {
-          "type": "array",
-          "description": "A list of skills necessary to complete the task.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "location": {
-          "type": "string",
-          "description": "The geographical location where the task needs to be performed."
-        },
-        "latitude": {
-          "type": "number",
-          "description": "The latitude coordinate for map visualization."
-        },
-        "longitude": {
-          "type": "number",
-          "description": "The longitude coordinate for map visualization."
-        },
-        "urgency": {
-          "type": "string",
-          "description": "The urgency level of the task ('high', 'medium', 'low')."
-        },
-        "priority": {
-          "type": "number",
-          "description": "A numerical representation of urgency (3 for high, 2 for medium, 1 for low)."
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the task (e.g., 'open', 'assigned', 'completed', 'cancelled')."
-        },
-        "submittedBy": {
-          "type": "string",
-          "description": "The name of the organization or individual who submitted the task."
-        },
-        "contactEmail": {
-          "type": "string",
-          "description": "The contact email for the organization or NGO.",
-          "format": "email"
-        },
-        "assignedTo": {
-          "type": "string",
-          "description": "The name of the volunteer assigned to this task."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the task was submitted.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the task was last updated.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "urgency": { "type": "string" },
+        "priority": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "assigned", "completed"] },
+        "assignedTo": { "type": "string" },
+        "assignedVolunteerId": { "type": "string" },
+        "isPaid": { "type": "boolean" },
+        "workDuration": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "submittedBy": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "title",
-        "description",
-        "category",
-        "location",
-        "latitude",
-        "longitude",
-        "urgency",
-        "priority",
-        "status",
-        "submittedBy",
-        "contactEmail",
-        "createdAt"
-      ]
+      "required": ["id", "title", "description", "category", "location", "latitude", "longitude", "urgency", "priority", "status", "submittedBy", "createdAt"]
     },
     "ActivityLog": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ActivityLog",
       "type": "object",
-      "description": "A real-time log of humanitarian activities across the system.",
       "properties": {
-        "id": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string",
-          "description": "The descriptive message of the event."
-        },
-        "type": {
-          "type": "string",
-          "enum": ["new_task", "assigned", "completed"]
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "message", "type", "timestamp"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
@@ -196,30 +99,24 @@
         "path": "/volunteerProfiles/{volunteerId}",
         "definition": {
           "entityName": "VolunteerProfile",
-          "schema": {
-            "$ref": "#/backend/entities/VolunteerProfile"
-          },
-          "description": "Stores individual volunteer profiles."
+          "schema": { "$ref": "#/backend/entities/VolunteerProfile" },
+          "description": "Volunteer status tracking."
         }
       },
       {
         "path": "/tasks/{taskId}",
         "definition": {
           "entityName": "Task",
-          "schema": {
-            "$ref": "#/backend/entities/Task"
-          },
-          "description": "Stores task details."
+          "schema": { "$ref": "#/backend/entities/Task" },
+          "description": "Mission tracking."
         }
       },
       {
         "path": "/activities/{activityId}",
         "definition": {
           "entityName": "ActivityLog",
-          "schema": {
-            "$ref": "#/backend/entities/ActivityLog"
-          },
-          "description": "Stores audit logs of events."
+          "schema": { "$ref": "#/backend/entities/ActivityLog" },
+          "description": "Real-time audit log."
         }
       }
     ]
