@@ -13,17 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, useUser } from "@/firebase";
 import { collection, serverTimestamp, doc, query, orderBy, limit, deleteField, setDoc, arrayUnion } from "firebase/firestore";
-import { MapPin, AlertTriangle, Activity, Loader2, BarChart3, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck, UserMinus, XCircle, RotateCcw, Briefcase, Clock, Users, DollarSign, Send, CheckCircle2 } from "lucide-react";
+import { MapPin, AlertTriangle, Activity, Loader2, BarChart3, Navigation, ShieldCheck, FilterX, Target, LocateFixed, Route, UserCheck, UserMinus, XCircle, RotateCcw, Briefcase, Clock, Users, DollarSign, Send, CheckCircle2, Globe, Zap, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import dynamic from "next/dynamic";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Bar, BarChart, XAxis, YAxis, Cell } from "recharts";
 
 const InteractiveMap = dynamic(() => import("@/components/Map"), { 
   ssr: false,
@@ -75,17 +68,6 @@ interface Volunteer {
   };
 }
 
-interface Match {
-  taskId: string;
-  volunteerId: string;
-  score: number;
-  reasons: string[];
-  taskTitle: string;
-  volunteerName: string;
-  location: string;
-  distance: string;
-}
-
 interface ActivityLog {
   id: string;
   message: string;
@@ -106,13 +88,6 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * c;
 }
 
-const chartConfig = {
-  tasks: {
-    label: "Needs Count",
-    color: "hsl(var(--primary))",
-  },
-} satisfies ChartConfig;
-
 export default function Dashboard() {
   const db = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -126,7 +101,6 @@ export default function Dashboard() {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-  // Workforce Assignment State
   const [assignmentParams, setAssignmentParams] = useState({
     isPaid: false,
     duration: "1",
@@ -153,58 +127,58 @@ export default function Dashboard() {
   const { data: rawVolunteers, isLoading: volunteersLoading } = useCollection<Volunteer>(volunteersQuery);
   const { data: activities, isLoading: activitiesLoading } = useCollection<ActivityLog>(activitiesQuery);
 
+  const currentUserProfile = useMemo(() => {
+    if (!rawVolunteers || !user) return null;
+    return rawVolunteers.find(v => v.id === user.uid);
+  }, [rawVolunteers, user]);
+
   const activeTasksForMap = useMemo(() => {
     if (!rawTasks) return EMPTY_ARRAY;
     return rawTasks.filter(t => t.status !== 'completed');
   }, [rawTasks]);
 
-  const availableVolunteers = useMemo(() => {
-    if (!rawVolunteers) return EMPTY_ARRAY;
-    return rawVolunteers.filter(v => v.status === 'available');
-  }, [rawVolunteers]);
+  const renderTags = useCallback((task: Task) => {
+    const tags = [];
+    
+    // Urgent Need
+    if (task.urgency === 'high') {
+      tags.push({ label: 'Urgent Need', icon: AlertTriangle, color: 'bg-destructive text-destructive-foreground' });
+    }
 
-  const matches = useMemo(() => {
-    if (!rawTasks || !availableVolunteers) return EMPTY_ARRAY;
-    const results: Match[] = [];
-    rawTasks.filter(t => t.status === 'open').forEach(task => {
-      availableVolunteers.forEach(volunteer => {
-        const dist = getDistance(task.latitude, task.longitude, volunteer.latitude, volunteer.longitude);
-        let score = 0;
-        const proximityScore = Math.max(0, 150 - (dist / 2)); 
-        score += proximityScore;
-        const matchedSkills = task.skillsRequired.filter(skill => 
-          volunteer.skills.some(vSkill => vSkill.toLowerCase() === skill.toLowerCase())
-        );
-        if (matchedSkills.length > 0) score += matchedSkills.length * 40;
-        score += (task.priority * 20);
+    // Opportunity Type
+    if (task.isPaid) {
+      tags.push({ label: 'Part-Time Job', icon: Briefcase, color: 'bg-primary text-primary-foreground' });
+    } else {
+      tags.push({ label: 'Volunteer Work', icon: Heart, color: 'bg-accent text-accent-foreground' });
+    }
 
-        if (score > 60) {
-          results.push({
-            taskId: task.id,
-            volunteerId: volunteer.id,
-            score: Math.round(score),
-            reasons: matchedSkills.length > 0 ? [`${matchedSkills.length} Skills Match`] : ["Proximity Match"],
-            taskTitle: task.title,
-            volunteerName: volunteer.name,
-            location: task.location,
-            distance: dist.toFixed(1)
-          });
-        }
-      });
-    });
-    return results.sort((a, b) => b.score - a.score);
-  }, [rawTasks, availableVolunteers]);
+    // Local vs Remote
+    let isLocal = false;
+    if (currentUserProfile) {
+      const dist = getDistance(currentUserProfile.latitude, currentUserProfile.longitude, task.latitude, task.longitude);
+      if (dist < 15) isLocal = true;
+    } else if (userLocation) {
+      const dist = getDistance(userLocation[0], userLocation[1], task.latitude, task.longitude);
+      if (dist < 15) isLocal = true;
+    }
 
-  const areaImpact = useMemo(() => {
-    if (!rawTasks) return EMPTY_ARRAY;
-    const counts: Record<string, number> = {};
-    rawTasks.filter(t => t.status === 'open').forEach(t => {
-      counts[t.location] = (counts[t.location] || 0) + 1;
-    });
-    return Object.entries(counts)
-      .map(([name, count]) => ({ name, tasks: count }))
-      .sort((a, b) => b.tasks - a.tasks);
-  }, [rawTasks]);
+    if (isLocal) {
+      tags.push({ label: 'Local Opportunity', icon: MapPin, color: 'bg-emerald-500 text-white' });
+    } else {
+      tags.push({ label: 'Remote NGO Support', icon: Globe, color: 'bg-slate-500 text-white' });
+    }
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {tags.map((tag, idx) => (
+          <Badge key={idx} className={cn("text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 border-none", tag.color)}>
+            <tag.icon className="h-2 w-2 mr-1" />
+            {tag.label}
+          </Badge>
+        ))}
+      </div>
+    );
+  }, [currentUserProfile, userLocation]);
 
   const logActivity = useCallback((type: string, message: string) => {
     if (!db) return;
@@ -241,7 +215,7 @@ export default function Dashboard() {
       applicants: arrayUnion(user.uid)
     });
     logActivity("application", `${user.displayName || 'Responder'} applied for mission: ${taskId}`);
-    toast({ title: "Application Transmitted", description: "NGO has received your coordinates and briefing." });
+    toast({ title: "Application Transmitted", description: "NGO has received your coordinates." });
   }, [db, user, logActivity, toast]);
 
   const handleHireVolunteer = useCallback((taskId: string, volunteerId: string, volunteerName: string) => {
@@ -272,7 +246,7 @@ export default function Dashboard() {
       }
     });
 
-    logActivity("hired", `${volunteerName} authorized by ${user.displayName || 'NGO'} for ${task?.title}`);
+    logActivity("hired", `${volunteerName} deployed for ${task?.title}`);
     toast({ title: "Workforce Deployed", description: `${volunteerName} assignment active.` });
   }, [db, user, rawTasks, assignmentParams, logActivity, toast]);
 
@@ -314,6 +288,38 @@ export default function Dashboard() {
     toast({ title: "Mission Successful", description: "Personnel released." });
   }, [db, toast, rawTasks, logActivity]);
 
+  const handleFocusEmergency = useCallback(() => {
+    if (!rawTasks) return;
+    const highUrgency = rawTasks.filter(t => t.status === 'open' && t.urgency === 'high');
+    if (highUrgency.length > 0) {
+      const top = highUrgency.sort((a, b) => (b.priority || 0) - (a.priority || 0))[0];
+      handleTaskSelect(top.id);
+      toast({ title: "🚨 Emergency Focus Lock", description: `Centering on high-priority mission: ${top.title}` });
+    } else {
+      toast({ title: "Operational Status Clear", description: "No high-urgency tasks detected in grid." });
+    }
+  }, [rawTasks, handleTaskSelect, toast]);
+
+  const handleResetFilters = useCallback(() => {
+    setCategoryFilter('all');
+    setUrgencyFilter('all');
+    setLocationFilter('all');
+    setMapCenter(DEFAULT_CENTER);
+    setMapZoom(DEFAULT_ZOOM);
+    setSelectedTaskId(null);
+    toast({ title: "Grid Reset", description: "All filters and views returned to global defaults." });
+  }, [toast]);
+
+  const filteredTasks = useMemo(() => {
+    if (!rawTasks) return EMPTY_ARRAY;
+    return rawTasks.filter(t => {
+      const matchCat = categoryFilter === 'all' || t.category === categoryFilter;
+      const matchUrg = urgencyFilter === 'all' || t.urgency === urgencyFilter;
+      const matchLoc = locationFilter === 'all' || t.location === locationFilter;
+      return matchCat && matchUrg && matchLoc;
+    });
+  }, [rawTasks, categoryFilter, urgencyFilter, locationFilter]);
+
   if (isUserLoading || tasksLoading || volunteersLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -334,7 +340,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-8 w-8 text-primary" />
               <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase leading-none">
-                Operational Grid
+                Command Hub
               </h1>
             </div>
             <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -343,11 +349,16 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-muted p-1 rounded-xl flex gap-1 border shadow-sm">
+             <Button variant="destructive" size="sm" className="h-10 rounded-xl font-black uppercase text-[10px] px-5 shadow-lg group" onClick={handleFocusEmergency}>
+               <AlertTriangle className="h-4 w-4 mr-2 group-hover:scale-125 transition-transform" />
+               🚨 Focus Emergency
+             </Button>
+
+            <div className="bg-muted p-1 rounded-xl flex gap-1 border shadow-sm h-10 items-center">
               <Button 
                 variant={simulationRole === 'ngo' ? 'default' : 'ghost'} 
                 size="sm"
-                className={cn("rounded-lg font-bold uppercase text-[9px] tracking-widest px-4 h-9", simulationRole === 'ngo' && "shadow-sm")}
+                className={cn("rounded-lg font-bold uppercase text-[9px] tracking-widest px-4 h-8", simulationRole === 'ngo' && "shadow-sm")}
                 onClick={() => setSimulationRole('ngo')}
               >
                 NGO Control
@@ -355,7 +366,7 @@ export default function Dashboard() {
               <Button 
                 variant={simulationRole === 'volunteer' ? 'default' : 'ghost'} 
                 size="sm"
-                className={cn("rounded-lg font-bold uppercase text-[9px] tracking-widest px-4 h-9", simulationRole === 'volunteer' && "shadow-sm")}
+                className={cn("rounded-lg font-bold uppercase text-[9px] tracking-widest px-4 h-8", simulationRole === 'volunteer' && "shadow-sm")}
                 onClick={() => setSimulationRole('volunteer')}
               >
                 Responder
@@ -366,29 +377,75 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-9 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-card p-4 rounded-2xl border shadow-sm">
+               <div className="space-y-1">
+                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Relief Sector</Label>
+                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                   <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Category" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="all">All Sectors</SelectItem>
+                     <SelectItem value="Food">Food Distribution</SelectItem>
+                     <SelectItem value="Medical">Medical Aid</SelectItem>
+                     <SelectItem value="Teaching">Education</SelectItem>
+                     <SelectItem value="Logistics">Supply Chain</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-1">
+                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Urgency</Label>
+                 <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+                   <SelectTrigger className="rounded-xl h-10 border-2"><SelectValue placeholder="Urgency" /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="all">All Levels</SelectItem>
+                     <SelectItem value="high">Critical</SelectItem>
+                     <SelectItem value="medium">Standard</SelectItem>
+                     <SelectItem value="low">Low Priority</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-1">
+                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Sector Area</Label>
+                 <Input className="rounded-xl h-10 border-2" placeholder="Search City..." value={locationFilter === 'all' ? '' : locationFilter} onChange={e => setLocationFilter(e.target.value || 'all')} />
+               </div>
+               <div className="flex items-end">
+                 <Button variant="outline" className="w-full h-10 rounded-xl font-bold uppercase text-[9px] tracking-widest border-2 gap-2" onClick={handleResetFilters}>
+                   <RotateCcw className="h-3.5 w-3.5" />
+                   Reset View
+                 </Button>
+               </div>
+            </div>
+
             <Card className="border-2 shadow-2xl overflow-hidden h-[500px] relative bg-card rounded-[2.5rem]">
               <InteractiveMap 
-                tasks={activeTasksForMap} 
+                tasks={filteredTasks} 
                 volunteers={rawVolunteers || EMPTY_ARRAY} 
                 center={mapCenter} 
                 zoom={mapZoom}
                 userLocation={userLocation}
                 selectedTaskId={selectedTaskId}
                 onTaskSelect={handleTaskSelect}
+                renderTags={renderTags}
               />
+              {selectedTaskId && (
+                <div className="absolute top-6 left-6 z-10">
+                  <Button size="sm" variant="secondary" className="rounded-full shadow-2xl font-black uppercase text-[9px] px-6 h-10 border-2 border-white/50 backdrop-blur-md" onClick={() => setSelectedTaskId(null)}>
+                    <XCircle className="h-4 w-4 mr-2" /> Deactivate Route
+                  </Button>
+                </div>
+              )}
             </Card>
 
             {simulationRole === 'ngo' ? (
               <Tabs defaultValue="broadcasts" className="space-y-6">
                 <TabsList className="bg-muted p-1 rounded-xl h-12 border shadow-sm w-full sm:w-auto">
-                  <TabsTrigger value="broadcasts" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Recruitment</TabsTrigger>
-                  <TabsTrigger value="workforce" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Workforce</TabsTrigger>
-                  <TabsTrigger value="transparency" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Transparency</TabsTrigger>
+                  <TabsTrigger value="broadcasts" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Broadcasts</TabsTrigger>
+                  <TabsTrigger value="workforce" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Operational Workforce</TabsTrigger>
+                  <TabsTrigger value="transparency" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Transparency Grid</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="broadcasts" className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {rawTasks?.filter(t => t.submittedBy === (user?.displayName || "NGO Partner") && t.status === 'open').map(task => (
+                    {filteredTasks.filter(t => t.submittedBy === (user?.displayName || "NGO Partner") && t.status === 'open').map(task => (
                       <Card key={task.id} className="border-2 rounded-2xl overflow-hidden bg-card">
                          <CardHeader className="pb-2">
                            <div className="flex justify-between items-start">
@@ -396,6 +453,7 @@ export default function Dashboard() {
                              <Badge className="bg-primary/10 text-primary uppercase text-[8px]">{task.applicants?.length || 0} Applicants</Badge>
                            </div>
                            <CardTitle className="text-lg font-black uppercase mt-2">{task.title}</CardTitle>
+                           {renderTags(task)}
                          </CardHeader>
                          <CardContent className="space-y-4">
                            <div className="p-3 bg-muted rounded-xl text-[10px] font-medium italic">
@@ -415,15 +473,15 @@ export default function Dashboard() {
                                    <span className="text-[10px] font-bold uppercase">{applicant?.name || "Anonymous"}</span>
                                    <Dialog>
                                      <DialogTrigger asChild>
-                                       <Button size="sm" variant="outline" className="h-7 text-[8px] font-bold uppercase">Review</Button>
+                                       <Button size="sm" variant="outline" className="h-7 text-[8px] font-bold uppercase">Authorize</Button>
                                      </DialogTrigger>
                                      <DialogContent className="rounded-3xl">
                                        <DialogHeader>
                                          <DialogTitle className="uppercase font-black">Authorize Deployment</DialogTitle>
-                                         <DialogDescription>Assign {applicant?.name} to {task.title}</DialogDescription>
+                                         <DialogDescription>Assign {applicant?.name} to mission: {task.title}</DialogDescription>
                                        </DialogHeader>
                                        <div className="space-y-4 py-4">
-                                         <Input placeholder="Role (e.g. Lead Medic)" onChange={e => setAssignmentParams(p => ({...p, role: e.target.value}))} />
+                                         <Input placeholder="Operational Role (e.g. Lead Medic)" onChange={e => setAssignmentParams(p => ({...p, role: e.target.value}))} />
                                          <div className="grid grid-cols-2 gap-2">
                                            <Input type="number" placeholder="Duration" onChange={e => setAssignmentParams(p => ({...p, duration: e.target.value}))} />
                                            <Select onValueChange={v => setAssignmentParams(p => ({...p, unit: v}))}>
@@ -436,7 +494,7 @@ export default function Dashboard() {
                                          </div>
                                        </div>
                                        <DialogFooter>
-                                         <Button className="w-full uppercase font-black" onClick={() => handleHireVolunteer(task.id, appId, applicant?.name || "Responder")}>Authorize</Button>
+                                         <Button className="w-full uppercase font-black" onClick={() => handleHireVolunteer(task.id, appId, applicant?.name || "Responder")}>Confirm Deployment</Button>
                                        </DialogFooter>
                                      </DialogContent>
                                    </Dialog>
@@ -450,29 +508,30 @@ export default function Dashboard() {
                          </CardContent>
                       </Card>
                     ))}
-                    {rawTasks?.filter(t => t.submittedBy === (user?.displayName || "NGO Partner") && t.status === 'open').length === 0 && (
+                    {filteredTasks.filter(t => t.submittedBy === (user?.displayName || "NGO Partner") && t.status === 'open').length === 0 && (
                       <div className="col-span-full py-12 text-center border-4 border-dashed rounded-3xl opacity-30">
                         <Send className="h-10 w-10 mx-auto mb-4" />
-                        <p className="font-black uppercase tracking-widest text-xs">No active recruitment broadcasts.</p>
+                        <p className="font-black uppercase tracking-widest text-xs">No matching recruitment broadcasts.</p>
                       </div>
                     )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="workforce" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {rawTasks?.filter(t => t.assignedVolunteerId && t.submittedBy === (user?.displayName || "NGO Partner")).map(task => (
+                  {filteredTasks.filter(t => t.assignedVolunteerId && t.submittedBy === (user?.displayName || "NGO Partner")).map(task => (
                     <Card key={task.id} className="border-2 shadow-lg rounded-2xl overflow-hidden bg-card border-accent/20">
                       <CardHeader className="p-5">
                          <div className="flex justify-between items-center mb-2">
-                           <Badge className="bg-accent text-white uppercase text-[8px] font-bold tracking-widest px-2 py-0.5">Active Contract</Badge>
+                           <Badge className="bg-accent text-white uppercase text-[8px] font-bold tracking-widest px-2 py-0.5">On Duty</Badge>
                            <span className="text-[9px] font-bold uppercase text-muted-foreground">{task.workDuration}</span>
                          </div>
                          <CardTitle className="text-lg font-black uppercase leading-tight">{task.assignedTo}</CardTitle>
                          <CardDescription className="text-[10px] font-bold uppercase text-primary">Mission: {task.title}</CardDescription>
+                         {renderTags(task)}
                       </CardHeader>
                       <CardFooter className="p-5 pt-0 flex gap-2">
                         <Button variant="outline" className="flex-1 h-10 text-[10px] font-bold uppercase rounded-xl border-2" onClick={() => handleMarkAsCompleted(task.id, task.assignedVolunteerId)}>
-                          Complete
+                          Success
                         </Button>
                         <Button variant="destructive" className="flex-1 h-10 text-[10px] font-bold uppercase rounded-xl shadow-lg" onClick={() => handleRemoveResponder(task.id, task.assignedVolunteerId)}>
                           Recall
@@ -493,22 +552,22 @@ export default function Dashboard() {
                         <table className="w-full text-left">
                           <thead className="bg-muted/30 border-b text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                             <tr>
-                              <th className="px-6 py-4">NGO</th>
-                              <th className="px-6 py-4">Personnel</th>
+                              <th className="px-6 py-4">NGO Agent</th>
+                              <th className="px-6 py-4">Responder Unit</th>
                               <th className="px-6 py-4">Mission</th>
-                              <th className="px-6 py-4">Contract</th>
+                              <th className="px-6 py-4">Type</th>
                               <th className="px-6 py-4">Status</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y text-[11px] font-bold">
-                            {rawTasks?.filter(t => t.status === 'assigned').map(task => (
+                            {filteredTasks.filter(t => t.status === 'assigned').map(task => (
                               <tr key={task.id} className="hover:bg-muted/10">
                                 <td className="px-6 py-4 uppercase">{task.submittedBy}</td>
                                 <td className="px-6 py-4 uppercase">{task.assignedTo}</td>
                                 <td className="px-6 py-4 uppercase text-muted-foreground">{task.title}</td>
-                                <td className="px-6 py-4 uppercase">{task.isPaid ? 'Paid' : 'Unpaid'}</td>
+                                <td className="px-6 py-4 uppercase">{task.isPaid ? 'Part-Time' : 'Volunteer'}</td>
                                 <td className="px-6 py-4">
-                                  <Badge className="bg-accent/10 text-accent text-[8px] uppercase">On Duty</Badge>
+                                  <Badge className="bg-accent/10 text-accent text-[8px] uppercase">Active Deployment</Badge>
                                 </td>
                               </tr>
                             ))}
@@ -522,14 +581,21 @@ export default function Dashboard() {
             ) : (
               <Tabs defaultValue="nearby" className="space-y-6">
                  <TabsList className="bg-muted p-1 rounded-xl h-12 border shadow-sm">
-                   <TabsTrigger value="nearby" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Missions</TabsTrigger>
-                   <TabsTrigger value="assignments" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Assignments</TabsTrigger>
+                   <TabsTrigger value="nearby" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">Mission Board</TabsTrigger>
+                   <TabsTrigger value="assignments" className="rounded-lg font-bold uppercase text-[10px] tracking-widest px-6 h-full">My Assignments</TabsTrigger>
                  </TabsList>
 
                  <TabsContent value="nearby">
                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                     {rawTasks?.filter(t => t.status === 'open').map(task => {
-                       const dist = userLocation ? getDistance(userLocation[0], userLocation[1], task.latitude, task.longitude) : null;
+                     {filteredTasks.filter(t => t.status === 'open').map(task => {
+                       const dist = (userLocation || (currentUserProfile ? [currentUserProfile.latitude, currentUserProfile.longitude] : null)) 
+                         ? getDistance(
+                             userLocation?.[0] || currentUserProfile?.latitude || 0, 
+                             userLocation?.[1] || currentUserProfile?.longitude || 0, 
+                             task.latitude, 
+                             task.longitude
+                           ) 
+                         : null;
                        const hasApplied = task.applicants?.includes(user?.uid || "");
                        return (
                          <Card key={task.id} className="border-2 shadow-lg bg-card rounded-2xl overflow-hidden flex flex-col hover:border-primary transition-all">
@@ -539,26 +605,23 @@ export default function Dashboard() {
                                 {dist !== null && <span className="text-[9px] font-black text-primary">{dist.toFixed(1)}KM</span>}
                               </div>
                               <CardTitle className="text-lg font-black uppercase truncate">{task.title}</CardTitle>
+                              {renderTags(task)}
                             </CardHeader>
                             <CardContent className="p-5 pt-2 space-y-4 flex-grow">
                                <p className="text-[11px] text-muted-foreground italic font-medium line-clamp-3">"{task.description}"</p>
-                               <div className="flex flex-wrap gap-1.5">
-                                 {task.isPaid && <Badge variant="secondary" className="text-[8px] font-black uppercase text-accent border-accent/20">Paid Opp</Badge>}
-                                 {task.requiredPeople && <Badge variant="secondary" className="text-[8px] font-black uppercase text-primary/60 border-primary/10">{task.requiredPeople} Positions</Badge>}
-                               </div>
                             </CardContent>
                             <CardFooter className="p-5 pt-0 flex gap-2">
-                               <Button className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl" onClick={() => handleTaskSelect(task.id)}>
+                               <Button className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl shadow-md" onClick={() => handleTaskSelect(task.id)}>
                                  <MapPin className="h-4 w-4 mr-2" /> Locate
                                </Button>
                                <Button 
                                  variant={hasApplied ? "secondary" : "default"} 
                                  disabled={hasApplied}
-                                 className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl"
+                                 className="flex-1 h-11 text-[10px] font-black uppercase rounded-xl shadow-lg"
                                  onClick={() => handleApplyForMission(task.id)}
                                >
                                  {hasApplied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                                 {hasApplied ? 'Applied' : 'Apply'}
+                                 {hasApplied ? 'Registered' : 'Apply'}
                                </Button>
                             </CardFooter>
                          </Card>
@@ -569,18 +632,19 @@ export default function Dashboard() {
 
                  <TabsContent value="assignments">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {rawTasks?.filter(t => t.assignedVolunteerId && t.assignedVolunteerId === user?.uid).map(task => (
+                      {filteredTasks.filter(t => t.assignedVolunteerId && t.assignedVolunteerId === user?.uid).map(task => (
                         <Card key={task.id} className="border-4 rounded-[2rem] overflow-hidden shadow-2xl border-accent/20">
                            <CardHeader className="p-6">
-                             <Badge className="bg-accent text-white uppercase text-[10px] font-black mb-4 w-fit">Active Assignment</Badge>
+                             <Badge className="bg-accent text-white uppercase text-[10px] font-black mb-4 w-fit">Active Unit Duty</Badge>
                              <CardTitle className="text-2xl font-black uppercase leading-tight">{task.title}</CardTitle>
                              <CardDescription className="text-xs font-bold uppercase text-primary mt-1">Managed By: {task.submittedBy}</CardDescription>
+                             {renderTags(task)}
                            </CardHeader>
                            <CardContent className="px-6 pb-6">
                              <div className="p-4 bg-muted rounded-2xl mb-6">
                                <p className="text-xs text-muted-foreground font-medium italic leading-relaxed">"{task.description}"</p>
                              </div>
-                             <Button className="w-full h-14 rounded-2xl font-black uppercase text-xs gap-3" onClick={() => handleTaskSelect(task.id)}>
+                             <Button className="w-full h-14 rounded-2xl font-black uppercase text-xs gap-3 shadow-xl" onClick={() => handleTaskSelect(task.id)}>
                                <Route className="h-6 w-6" /> Engaged Tactical Path
                              </Button>
                            </CardContent>

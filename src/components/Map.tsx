@@ -18,6 +18,7 @@ interface MapProps {
   userLocation?: [number, number] | null;
   onTaskSelect?: (taskId: string | null) => void;
   selectedTaskId?: string | null;
+  renderTags?: (task: any) => React.ReactNode;
 }
 
 const MapPinIcon = () => (
@@ -87,7 +88,8 @@ export default function InteractiveMap({
   zoom = 5, 
   userLocation,
   onTaskSelect,
-  selectedTaskId 
+  selectedTaskId,
+  renderTags
 }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [icons, setIcons] = useState<Record<string, any>>({});
@@ -216,6 +218,7 @@ export default function InteractiveMap({
                       {task.urgency}
                     </span>
                   </div>
+                  {renderTags && renderTags(task)}
                   <div className="text-[10px] text-muted-foreground flex items-center gap-2 font-bold uppercase">
                      <MapPinIcon /> {task.location}
                   </div>
@@ -227,18 +230,12 @@ export default function InteractiveMap({
                     </div>
                   )}
 
-                  {userLocation ? (
-                    <div className="pt-2 border-t mt-3 flex flex-col gap-2">
-                       <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
-                         <p className="text-[9px] font-black text-primary uppercase">Tactical Pathing Ready</p>
-                         <p className="text-[10px] text-muted-foreground italic">Distance calculated. Navigate to zone.</p>
-                       </div>
-                    </div>
-                  ) : (
-                    <div className="pt-2 border-t mt-3">
-                       <p className="text-[9px] text-amber-600 font-black uppercase italic tracking-wider">Sync GPS for routing</p>
-                    </div>
-                  )}
+                  <div className="pt-2 border-t mt-3 flex flex-col gap-2">
+                     <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
+                       <p className="text-[9px] font-black text-primary uppercase">Tactical Status</p>
+                       <p className="text-[10px] text-muted-foreground italic">{task.status === 'open' ? 'Ready for deployment.' : 'Mission in progress.'}</p>
+                     </div>
+                  </div>
                 </div>
               </Popup>
             </Marker>
